@@ -26,6 +26,8 @@ main()
     echo_and_run_cmd \
         cd "$this_script_abs_dir_path"
 
+    check_git_status_clean
+
     local package_name
     # Ex: 'send_input'
     package_name="$(basename "$(pwd)")"
@@ -71,6 +73,12 @@ main()
         ls -l "$release_package_file_name"
 
     echo_and_run_cmd \
+        git tag "$release_dir_name"
+
+    echo_and_run_cmd \
+        git push --tags
+
+    echo_and_run_cmd \
         cd "$orig_pwd"
 }
 
@@ -86,6 +94,25 @@ check_args()
         printf -- '    VERSION: Release version\n'
         printf -- '        Ex: 1.0\n'
         printf -- '\n'
+        exit 1
+    fi
+}
+
+# Ref: https://unix.stackexchange.com/a/155077/29414
+check_git_status_clean()
+{
+    local output
+    output="$(git status --porcelain)"
+
+    if [ ! -z "$output" ]
+    then
+        printf -- '\n'
+        printf -- '$ git status\n'
+        printf -- '... is not clean.  Please commit, then try again.\n'
+
+        echo_and_run_cmd \
+            git status
+
         exit 1
     fi
 }
