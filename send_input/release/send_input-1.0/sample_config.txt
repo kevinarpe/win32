@@ -1,0 +1,35 @@
+# Line format: <shortcut-key>|<send-keys-text>
+# <shortcut-key> format: {L/RCtrl+}{L/RShift+}{L/RAlt+}<virtual-key-code>
+#
+# ... where {LCtrl+} and {RCtrl+} are optional left/right Control key indicators,
+#     e.g., LCtrl+0x70 for LCtrl+F1 or RCtrl+0x71 for RCtrl+F2
+#
+# ... where {LShift+} and {RShift+} are optional left/right Shift key indicators,
+#     e.g., LShift+0x70 for LShift+F1 or RShift+0x71 for RShift+F2
+#
+# ... where {LAlt+} and {RAlt+} are optional left/right Alt key indicators,
+#     e.g., LAlt+0x70 for LAlt+F1 or RAlt+0x71 for RAlt+F2
+#
+# ... where L/RCtrl, L/RShift, L/RAlt modifiers may be combined,
+#     e.g., LCtrl+LShift+LAlt+0x70 for LCtrl+LShift+LAlt+F1
+#
+# ... where <virtual-key-code> is hexidecimal code (with 0x prefix) for Win32 virtual-key code,
+#     e.g., 0x70 for F1
+#     Read more here: https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
+#
+# Whitespace is ignored, except in <send-keys-text>.
+# Empty lines are ignored.
+# If first character is '#', then entire line is treated as a comment and ignored.
+#
+# Example(1): # This is a comment.
+# Example(2): LCtrl+LShift+LAlt+0x70|username
+#             ... will send input 'username'  for keyboard shortcut: LCtrl+LShift+LAlt+F1
+# Example(3): LCtrl+LShift+LAlt+0x71|P*assw0rd
+#             ... will send input 'P*assw0rd' for keyboard shortcut: LCtrl+LShift+LAlt+F2
+
+# F7: 0x76
+LCtrl+LShift+LAlt+0x76|username
+
+# F8: 0x77
+LCtrl+LShift+LAlt+0x77|P*assw0rd
+

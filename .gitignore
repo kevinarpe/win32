@@ -1,0 +1,11 @@
+# Vi
+*.*.swp
+*.sw*
+
+# GCC/MinGW artefacts
+*.o
+*.exe
+
+# Projects not for Git
+hello-world/
+
