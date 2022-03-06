@@ -216,11 +216,6 @@ static void InternalWStrSplit(_In_    const struct WStr *lpWStrText,
     }
 }
 
-// TODO: More tests w/ delim = "\r\n"
-// "abc" -> ["abc"]
-// "abc\r\n" -> ["abc", ""]
-// "\r\n" -> ["", ""]
-// "" -> [""]
 void WStrSplit(_In_    const struct WStr *lpWStrText,
                _In_    const struct WStr *lpWStrDelim,
                _In_    const int          iMaxTokenCount,  // -1 for unlimited
@@ -228,72 +223,8 @@ void WStrSplit(_In_    const struct WStr *lpWStrText,
 {
     const BOOL bDiscardFinalEmptyToken = FALSE;
     InternalWStrSplit(lpWStrText, lpWStrDelim, iMaxTokenCount, bDiscardFinalEmptyToken, lpTokenWStrArr);
-/*
-    WStrAssertValid(lpWStrText);
-    WStrAssertValid(lpWStrDelim);
-    // Do not allow empty delim
-    assert(0 != lpWStrDelim->ulSize);
-    assert(-1 == iMaxTokenCount || iMaxTokenCount >= 2);
-    WStrArrFree(lpTokenWStrArr);
-
-    // Important: Text after last delim is final token.
-    const int iMaxDelimCount = (-1 == iMaxTokenCount) ? -1 : (iMaxTokenCount - 1);
-    size_t ulDelimCount = 0;
-
-    const wchar_t *lpIter = lpWStrText->lpWCharArr;
-    while (TRUE)
-    {
-        const wchar_t *lpNextDelim = wcsstr(lpIter, lpWStrDelim->lpWCharArr);
-        if (NULL == lpNextDelim) {
-            break;
-        }
-        ++ulDelimCount;
-        if (-1 != iMaxDelimCount && iMaxDelimCount == ulDelimCount) {
-            break;
-        }
-        lpIter = lpNextDelim + lpWStrDelim->ulSize;
-    }
-
-    const size_t ulTokenCount = 1U + ulDelimCount;
-    WStrArrAlloc(lpTokenWStrArr, ulTokenCount);
-
-    size_t ulTokenIndex = 0;
-    lpIter = lpWStrText->lpWCharArr;
-    while (TRUE)
-    {
-        const wchar_t *lpNextDelim = wcsstr(lpIter, lpWStrDelim->lpWCharArr);
-
-        // Intention: Include (-1 == iMaxTokenCount) for readability.
-        const BOOL bIsLastToken = (-1 == iMaxTokenCount) ? FALSE : (1U + ulTokenIndex == iMaxTokenCount);
-
-        if (NULL == lpNextDelim || bIsLastToken)
-        {
-            // Point to trailing null char
-            lpNextDelim = lpIter + wcslen(lpIter);
-        }
-
-        const ptrdiff_t lTokenLen = lpNextDelim - lpIter;
-        // Note: Empty token is allowed, e.g., L""
-        assert(lTokenLen >= 0);
-
-        WStrCopyWCharArr(lpTokenWStrArr->lpWStrArr + ulTokenIndex, lpIter, lTokenLen);
-        ++ulTokenIndex;
-
-        if (L'\0' == *lpNextDelim) {
-            break;
-        }
-        lpIter = lpNextDelim + lpWStrDelim->ulSize;
-    }
-
-    assert(ulTokenIndex == ulTokenCount);
-*/
 }
 
-// TODO: More tests
-// "abc" -> ["abc"]
-// "abc\r\n" -> ["abc"]
-// "\r\n" -> [""]
-// "" -> [""]
 void WStrSplitNewLine(_In_    const struct WStr *lpWStrText,
                       _In_    const int          iMaxLineCount,
                       _Inout_ struct WStrArr    *lpTokenWStrArr)
@@ -306,13 +237,11 @@ void WStrSplitNewLine(_In_    const struct WStr *lpWStrText,
     if (NULL != wcsstr(lpWStrText->lpWCharArr, L"\r\n"))
     {
         struct WStr wstrDelim = {.lpWCharArr = L"\r\n", .ulSize = 2};
-//        WStrSplit(lpWStrText, &wstrDelim, iMaxLineCount, lpTokenWStrArr);
         InternalWStrSplit(lpWStrText, &wstrDelim, iMaxLineCount, bDiscardFinalEmptyToken, lpTokenWStrArr);
     }
     else if (NULL != wcsstr(lpWStrText->lpWCharArr, L"\n"))
     {
         struct WStr wstrDelim = {.lpWCharArr = L"\n", .ulSize = 1};
-//        WStrSplit(lpWStrText, &wstrDelim, iMaxLineCount, lpTokenWStrArr);
         InternalWStrSplit(lpWStrText, &wstrDelim, iMaxLineCount, bDiscardFinalEmptyToken, lpTokenWStrArr);
     }
     else
