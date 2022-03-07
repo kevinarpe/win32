@@ -212,7 +212,18 @@ void ConfigParseShortcutKey(_In_  const struct WStr  *lpShortcutKeyWStr,  // Ex:
     {
         // Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/snprintf-s-snprintf-s-l-snwprintf-s-snwprintf-s-l
         _snwprintf_s(g_lpErrorMsgBuffer, g_ulErrorMsgBufferSize, g_ulErrorMsgBufferSize,
-                     L"Config file: Line #%zd: Failed to parse virtual key code [%ls]%d\r\n"
+                     L"Config file: Line #%zd: Failed to parse virtual key code [%ls]\r\n"
+                     L"Line: %ls\r\n",
+                     (1 + ulLineIndex), lpVkCodeWStr->lpWCharArr, lpLineWStr->lpWCharArr);
+
+        ErrorExit(g_lpErrorMsgBuffer);
+    }
+
+    // Ref: https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
+    if (dwVkCode < 0x01 || dwVkCode > 0xFE)
+    {
+        _snwprintf_s(g_lpErrorMsgBuffer, g_ulErrorMsgBufferSize, g_ulErrorMsgBufferSize,
+                     L"Config file: Line #%zd: Invalid virtual key code [%ls]->%d: Min: 0x01 (1), Max: 0xFE (254)\r\n"
                      L"Line: %ls\r\n",
                      (1 + ulLineIndex), lpVkCodeWStr->lpWCharArr, dwVkCode, lpLineWStr->lpWCharArr);
 

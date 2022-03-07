@@ -19,17 +19,17 @@ main()
     echo_and_run_cmd \
         cd "$this_script_abs_dir_path"
 
-    echo_and_run_gcc_cmd \
-        -c -I .. -o ../error_exit.o ../error_exit.c
+    echo_and_run_gcc_cmd_if_necessary \
+        ../error_exit.c ../error_exit.o -I ..
 
-    echo_and_run_gcc_cmd \
-        -c -I .. -o ../win32_xmalloc.o ../win32_xmalloc.c
+    echo_and_run_gcc_cmd_if_necessary \
+        ../win32_xmalloc.c ../win32_xmalloc.o -I ..
 
-    echo_and_run_gcc_cmd \
-        -c -I .. -o ../wstr.o ../wstr.c
+    echo_and_run_gcc_cmd_if_necessary \
+        ../wstr.c ../wstr.o -I ..
 
-    echo_and_run_gcc_cmd \
-        -c -I .. -o wstr_test.o wstr_test.c
+    echo_and_run_gcc_cmd_if_necessary \
+        ../wstr_test.c ../wstr_test.o -I ..
 
     echo_and_run_gcc_cmd \
         -o wstr_test.exe ../error_exit.o ../win32_xmalloc.o ../wstr.o wstr_test.o -lgdi32
@@ -66,6 +66,24 @@ echo_and_run_gcc_cmd()
             -Wl,-subsystem,windows \
             -municode \
             "$@"
+}
+
+echo_and_run_gcc_cmd_if_necessary()
+{
+    # Ex: 'error_exit.c'
+    local input_file_path="$1"; shift
+    # Ex: 'error_exit.o'
+    local output_file_path="$1"; shift
+    # Remaining args stored in "$@"
+
+    if [ "$input_file_path" -nt "$output_file_path" ]
+    then
+        echo_and_run_gcc_cmd \
+            -c -o "$output_file_path" "$input_file_path" "$@"
+    # Remaining args stored in "$@"
+    else
+        printf -- '\n%s: Not updated\n' "$input_file_path"
+    fi
 }
 
 main "$@"

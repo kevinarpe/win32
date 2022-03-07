@@ -19,11 +19,11 @@ main()
     echo_and_run_cmd \
         cd "$this_script_abs_dir_path"
 
-    echo_and_run_gcc_cmd \
-        -c -I .. -o ../error_exit.o ../error_exit.c
+    echo_and_run_gcc_cmd_if_necessary \
+        ../error_exit.c ../error_exit.o -I ..
 
-    echo_and_run_gcc_cmd \
-        -c -I .. -o kb_test.o kb_test.c
+    echo_and_run_gcc_cmd_if_necessary \
+        ../kb_test.c ../kb_test.o -I ..
 
     echo_and_run_gcc_cmd \
         -o kb_test.exe ../error_exit.o kb_test.o -lgdi32
@@ -60,6 +60,24 @@ echo_and_run_gcc_cmd()
             -Wl,-subsystem,windows \
             -municode \
             "$@"
+}
+
+echo_and_run_gcc_cmd_if_necessary()
+{
+    # Ex: 'error_exit.c'
+    local input_file_path="$1"; shift
+    # Ex: 'error_exit.o'
+    local output_file_path="$1"; shift
+    # Remaining args stored in "$@"
+
+    if [ "$input_file_path" -nt "$output_file_path" ]
+    then
+        echo_and_run_gcc_cmd \
+            -c -o "$output_file_path" "$input_file_path" "$@"
+    # Remaining args stored in "$@"
+    else
+        printf -- '\n%s: Not updated\n' "$input_file_path"
+    fi
 }
 
 main "$@"

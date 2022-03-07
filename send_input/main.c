@@ -13,6 +13,15 @@ struct ConfigEntryDynArr g_configEntryDynArr = {};
 
 enum EKeyModifier g_eKeyModifiers = 0;
 
+// Ref: https://docs.microsoft.com/en-us/windows/console/registering-a-control-handler-function
+// Ref: https://docs.microsoft.com/en-us/windows/console/handlerroutine
+static BOOL WINAPI HandlerRoutine(_In_ DWORD dwCtrlType)
+{
+    printf("Handled event: CTRL_C_EVENT, CTRL_BREAK_EVENT, CTRL_CLOSE_EVENT, CTRL_LOGOFF_EVENT, CTRL_SHUTDOWN_EVENT\r\n");
+    // Ref: https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-exitprocess
+    ExitProcess(1);
+}
+
 static void UpdateEKeyModifiers(_In_ const BOOL              bIsKeyUp,
                                 _In_ const enum EKeyModifier eKeyModifier)
 {
@@ -40,18 +49,23 @@ static void HandleKeyUp(_In_ const DWORD dwVkCode)
             printf("SendKeys(%ls)\r\n", lpConfigEntry->sendKeysWStr.lpWCharArr);
             // Ref: https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput
             // Ref: https://stackoverflow.com/questions/32149644/keyboard-input-via-sendinput-win32-api-doesnt-work-hardware-one-does
-            const UINT uSent = SendInput(lpConfigEntry->inputKeyArr.ulSize,
-                                         lpConfigEntry->inputKeyArr.lpInputKeyArr,
-                                         sizeof(INPUT));
-
-            if (uSent != lpConfigEntry->inputKeyArr.ulSize)
+            // Ref: https://stackoverflow.com/a/71384213/257299
+            // Ref: https://batchloaf.wordpress.com/2014/10/02/using-sendinput-to-type-unicode-characters/
+            for (size_t j = 0; j < lpConfigEntry->inputKeyArr.ulSize; ++j)
             {
-                _snwprintf_s(g_lpErrorMsgBuffer, g_ulErrorMsgBufferSize, g_ulErrorMsgBufferSize,
-                             L"SendInput([%zd]%ls): Sent %zd events, but expected %zd\r\n",
-                             lpConfigEntry->sendKeysWStr.ulSize, lpConfigEntry->sendKeysWStr.lpWCharArr,
-                             uSent, lpConfigEntry->inputKeyArr.ulSize);
+                const UINT cInputs = 1;
+                const UINT uSent = SendInput(cInputs,                                       // [in] UINT    cInputs
+                                             lpConfigEntry->inputKeyArr.lpInputKeyArr + j,  // [in] LPINPUT pInputs
+                                             sizeof(INPUT));                                // [in] int     cbSize
+                if (uSent != cInputs)
+                {
+                    _snwprintf_s(g_lpErrorMsgBuffer, g_ulErrorMsgBufferSize, g_ulErrorMsgBufferSize,
+                                 L"SendInput([%zd]%ls[index:%zd]): Sent %zd events, but expected %zd\r\n",
+                                 lpConfigEntry->sendKeysWStr.ulSize, lpConfigEntry->sendKeysWStr.lpWCharArr, j,
+                                 uSent, lpConfigEntry->inputKeyArr.ulSize);
 
-                ErrorExit(g_lpErrorMsgBuffer);
+                    ErrorExit(g_lpErrorMsgBuffer);
+                }
             }
             break;
         }
@@ -228,6 +242,11 @@ int WINAPI wWinMain(HINSTANCE hInstance,      // The operating system uses this 
                     PWSTR     lpCmdLine,      // ... contains the command-line arguments as a Unicode string.
                     int       nCmdShow)       // ... is a flag that says whether the main application window will be minimized, maximized, or shown normally.
 {
+    const BOOL bIsAdd = TRUE;
+    if (!SetConsoleCtrlHandler(HandlerRoutine, bIsAdd))
+    {
+        ErrorExit(L"SetConsoleCtrlHandler()");
+    }
     wchar_t *lpConfigFilePath = NULL;
     CheckCommandLineArgs(&lpConfigFilePath);
 

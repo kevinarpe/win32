@@ -1,7 +1,6 @@
 #include "win32_winver.h"
 #include "error_exit.h"
 #include <windows.h>
-#include <strsafe.h>
 #include <assert.h>
 #include <wchar.h>
 #include <stdio.h>
@@ -171,8 +170,10 @@ LRESULT CALLBACK LowLevelKeyboardProc(_In_ int    nCode,
         const SHORT sRAltKeyState = GetAsyncKeyState(VK_RMENU);
         const BOOL  bIsRAltKeyDown = (sRAltKeyState & SHORT_MOST_SIGNIFICANT_BIT) ? TRUE : FALSE;
 
-        printf("eKeyModifiers: %d, wParam: %s, vkCode: 0x%X, IsExtended? %d, IsAltDown? %d, IsKeyUp? %d, Shift? %d, LShift? %d, RShift? %d, Ctrl? %d, LCtrl? %d, RCtrl? %d, Alt? %d, LAlt? %d, RAlt? %d\r\n",
-               eKeyModifiers, lpWParamDesc, info->vkCode, bIsExtended, bIsAltDown, bIsKeyUp,
+        const DWORD dwThreadId = GetCurrentThreadId();
+
+        printf("dwThreadId: %d, eKeyModifiers: %d, wParam: %s, vkCode: 0x%X, IsExtended? %d, IsAltDown? %d, IsKeyUp? %d, Shift? %d, LShift? %d, RShift? %d, Ctrl? %d, LCtrl? %d, RCtrl? %d, Alt? %d, LAlt? %d, RAlt? %d\r\n",
+               dwThreadId, eKeyModifiers, lpWParamDesc, info->vkCode, bIsExtended, bIsAltDown, bIsKeyUp,
                bIsShiftKeyDown, bIsLShiftKeyDown, bIsRShiftKeyDown,
                bIsCtrlKeyDown, bIsLCtrlKeyDown, bIsRCtrlKeyDown,
                bIsAltKeyDown, bIsLAltKeyDown, bIsRAltKeyDown);
@@ -230,8 +231,12 @@ int WINAPI wWinMain(HINSTANCE hInstance,      // The operating system uses this 
         ErrorExit(L"SetWindowsHookEx(WH_KEYBOARD_LL, ...)");
     }
 
+    const DWORD dwThreadId = GetCurrentThreadId();
+    const DWORD z = HSHELL_WINDOWREPLACED;
+
     printf("Press any key combination to watch low level keyboard events\r\n");
     printf("Press Ctrl+C in this terminal to exit\r\n");
+    printf("dwThreadId: %d\r\n", dwThreadId);
     printf("\r\n");
 
     MSG msg = {};
