@@ -4,6 +4,7 @@
 #include "wstr.h"
 #include <winuser.h>  // required for INPUT
 
+// Captain Obvious says: These are all bitwise flags (power of two).
 enum EKeyModifier
 {
     SHIFT_LEFT  = 1,
@@ -35,6 +36,7 @@ struct ConfigEntry
     struct ShortcutKey shortcutKey;
     struct WStr        sendKeysWStr;
     struct InputKeyArr inputKeyArr;
+    size_t             ulSendKeysCount;
 };
 
 struct ConfigEntryDynArr

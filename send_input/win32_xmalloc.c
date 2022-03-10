@@ -9,7 +9,7 @@ static HANDLE StaticGetProcessHeap()
     const HANDLE hProcessHeap = GetProcessHeap();
     if (NULL == hProcessHeap)
     {
-        ErrorExit(L"GetProcessHeap()");
+        ErrorExit("GetProcessHeap()");
     }
     return hProcessHeap;
 }
@@ -55,7 +55,7 @@ void xfree(void **lppData)
         // Ref: https://docs.microsoft.com/en-us/windows/win32/api/heapapi/nf-heapapi-heapfree
         if (!HeapFree(hProcessHeap, 0, *lppData))
         {
-            ErrorExit(L"HeapFree(hProcessHeap, 0, *lppData)");
+            ErrorExit("HeapFree(hProcessHeap, 0, *lppData)");
         }
         *lppData = NULL;
     }

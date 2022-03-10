@@ -14,12 +14,12 @@ set -o pipefail
 main()
 {
     local this_script_abs_dir_path
-    this_script_abs_dir_path="$(dirname "$0")"
+    this_script_abs_dir_path="$(dirname "$(readlink --canonicalize "$0")")"
 
     check_args "$@"
 
     # Ex: '1.0'
-    local version="$1"
+    local version="$1" ; shift
 
     local orig_pwd="$(pwd)"
 
@@ -39,7 +39,7 @@ main()
     local release_package_file_name="$release_dir_name.zip"
 
     echo_and_run_cmd \
-        ./build.bash
+        ./build.bash --release
 
     if [ -d "release/$release_dir_name" ]
     then
@@ -80,6 +80,8 @@ main()
 
     echo_and_run_cmd \
         cd "$orig_pwd"
+
+    printf -- '\nPlease upload this release to GitHub here: https://github.com/kevinarpe/win32/releases/new\n\n'
 }
 
 check_args()

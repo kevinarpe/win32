@@ -1,19 +1,17 @@
 #include "error_exit.h"
-#include <windows.h>
-#include <strsafe.h>  // required for StringCchPrintf()
+#include "win32.h"
+#include "log.h"
+#include <assert.h>
+//#include <strsafe.h>  // required for StringCchPrintf()
+#include <stdio.h>
 
-#ifndef UNICODE
-#define UNICODE
-#endif
-
-wchar_t g_lpErrorMsgBuffer[g_ulErrorMsgBufferSize] = {};
-
+/*
 // Ref: https://docs.microsoft.com/en-us/windows/win32/debug/retrieving-the-last-error-code
-void ErrorExit(const wchar_t *lpszFunction)
+void ErrorExit(_In_ const wchar_t *lpszFunction)
 {
     // Retrieve the system error message for the last-error code
 
-    LPVOID lpMsgBuf;
+    wchar_t *lpMsgBuf;
     LPVOID lpDisplayBuf;
     DWORD dw = GetLastError();
 
@@ -47,5 +45,62 @@ void ErrorExit(const wchar_t *lpszFunction)
     LocalFree(lpMsgBuf);
     LocalFree(lpDisplayBuf);
     ExitProcess(dw);
+}
+*/
+
+// Ref: https://docs.microsoft.com/en-us/windows/win32/debug/retrieving-the-last-error-code
+static void static_fprintf_error_then_exit(_In_ const DWORD dwLastError)
+{
+    const DWORD dwLanguageId = MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT);
+    wchar_t *lpWCharArr = NULL;
+    const DWORD dwStrLen = FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER
+                                          | FORMAT_MESSAGE_FROM_SYSTEM
+                                          | FORMAT_MESSAGE_IGNORE_INSERTS,  // [in] DWORD dwFlags
+                                          NULL,                             // [in, optional] LPCVOID lpSource
+                                          dwLastError,                      // [in] DWORD dwMessageId
+                                          dwLanguageId,                     // [in] DWORD dwLanguageId
+                                          (LPWSTR) &lpWCharArr,             // [out] LPWSTR lpBuffer
+                                          0,                                // [in] DWORD nSize
+                                          NULL);                            // [in, optional] va_list *Arguments
+    if (0 == dwStrLen)
+    {
+        Log(stderr, "ERROR: 0 == FormatMessageW(...)");
+        assert(0 != dwStrLen);  // Crash
+    }
+
+    LogF(stderr, "ERROR: Failed with error %lu: %ls", dwLastError, lpWCharArr);
+
+    // Ref: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-localfree
+    LocalFree(lpWCharArr);
+
+    // Ref: https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-exitprocess
+    ExitProcess(dwLastError);
+}
+
+void ErrorExit(_In_ const char *lpszMsg)
+{
+    assert(NULL != lpszMsg);
+
+    const DWORD dwLastError = GetLastError();
+
+    Log(stderr, lpszMsg);
+    static_fprintf_error_then_exit(dwLastError);
+}
+
+void ErrorExitF(_In_ const char *lpszMsgFmt, ...)
+{
+    assert(NULL != lpszMsgFmt);
+
+    const DWORD dwLastError = GetLastError();
+
+    // Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/va-arg-va-copy-va-end-va-start?view=msvc-170
+    va_list ap;
+    va_start(ap, lpszMsgFmt);
+
+    LogFV(stderr, lpszMsgFmt, ap);
+
+    va_end(ap);
+
+    static_fprintf_error_then_exit(dwLastError);
 }
 

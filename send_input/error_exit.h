@@ -1,12 +1,11 @@
 #ifndef _H_ERROR_EXIT
 #define _H_ERROR_EXIT
 
-#include <wchar.h>  // required for wchar_t
+#include <sal.h>    // required for _In_
 
-#define g_ulErrorMsgBufferSize ((size_t) 1024)
-extern wchar_t g_lpErrorMsgBuffer[];
+void ErrorExit(_In_ const char *lpszMsg);
 
-void ErrorExit(const wchar_t *lpszFunction);
+void ErrorExitF(_In_ const char *lpszMsgFmt, ...);
 
 #endif  // _H_ERROR_EXIT
 

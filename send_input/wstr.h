@@ -1,7 +1,7 @@
 #ifndef _H_WSTR
 #define _H_WSTR
 
-#include "win32_winver.h"
+#include "win32.h"
 #include <wchar.h>  // required for wchar_t
 #include <sal.h>    // required for _Inout_, etc.
 #include <windef.h>  // required for UINT

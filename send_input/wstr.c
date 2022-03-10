@@ -1,11 +1,8 @@
 #include "wstr.h"
-#include "error_exit.h"  // required for ErrorExit()
+#include "error_exit.h"
 #include "xmalloc.h"
 #include <assert.h>
 #include <windows.h>
-
-// Null character is either: (char) '\0' or (wchar_t) L'\0'
-const size_t LEN_NULL_CHAR = 1;
 
 void WStrAssertValid(_In_ const struct WStr *lpWStr)
 {
@@ -98,7 +95,8 @@ void WStrTrim(_Inout_ struct WStr                 *lpWStr,
     size_t ulTrailingCount = 0;
     if (0 != (eWStrTrim & WSTR_RTRIM))
     {
-        for (size_t i = lpWStr->ulSize - 1; i >= 0; --i)
+        // Note: Reverse iteration is tricky with unsigned values in C!  Example: 0U - 1U == SIZE_MAX
+        for (size_t i = lpWStr->ulSize - 1U; i < SIZE_MAX; --i)
         {
             const wchar_t ch = lpWStr->lpWCharArr[i];
             if (!fpWStrCharPredicateFunc(ch)) {
@@ -183,7 +181,7 @@ static void InternalWStrSplit(_In_    const struct WStr *lpWStrText,
 
         ++ulDelimCount;
 
-        if (-1 != iMaxDelimCount && iMaxDelimCount == ulDelimCount) {
+        if (-1 != iMaxDelimCount && ((size_t) iMaxDelimCount) == ulDelimCount) {
             break;
         }
     }
@@ -196,7 +194,7 @@ static void InternalWStrSplit(_In_    const struct WStr *lpWStrText,
     for (size_t ulTokenIndex = 0; ulTokenIndex < ulTokenCount; ++ulTokenIndex)
     {
         // Intention: Include (-1 == iMaxTokenCount) for readability.
-        const BOOL bIsLastToken = (-1 == iMaxTokenCount) ? FALSE : (1U + ulTokenIndex == iMaxTokenCount);
+        const BOOL bIsLastToken = (-1 == iMaxTokenCount) ? FALSE : (1U + ulTokenIndex == ((size_t) iMaxTokenCount));
 
         const wchar_t *lpNextDelim = wcsstr(lpIter, lpWStrDelim->lpWCharArr);
         if (NULL == lpNextDelim || bIsLastToken)
@@ -271,7 +269,7 @@ void WStrFileWrite(_In_ const wchar_t     *lpFilePath,
                                          NULL);                  // [in, optional] hTemplateFile
     if (INVALID_HANDLE_VALUE == hWriteFile)
     {
-        ErrorExit(L"CreateFile(lpFilePath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)");
+        ErrorExitF("CreateFile(lpFilePath[%ls], GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)", lpFilePath);
     }
 
     if (lpWStr->ulSize > 0)
@@ -289,7 +287,7 @@ void WStrFileWrite(_In_ const wchar_t     *lpFilePath,
         assert(iCharArrLen >= 0);
         if (0 == iCharArrLen)
         {
-            ErrorExit(L"WideCharToMultiByte(codePage, WC_ERR_INVALID_CHARS, lpWStr->lpWCharArr, -1, NULL, 0, NULL, NULL))");
+            ErrorExitF("WideCharToMultiByte(codePage[%ud], WC_ERR_INVALID_CHARS, lpWStr->lpWCharArr[%ld], -1, NULL, 0, NULL, NULL))", codePage, lpWStr->lpWCharArr);
         }
 
         // Important: WriteFile() only writes chars not wchars.
@@ -310,7 +308,7 @@ void WStrFileWrite(_In_ const wchar_t     *lpFilePath,
         assert(iCharArrLen2 >= 0);
         if (0 == iCharArrLen2)
         {
-            ErrorExit(L"WideCharToMultiByte(codePage, WC_ERR_INVALID_CHARS, lpWStr->lpWCharArr, -1, lpCharArr, ulCharArrLen, NULL, NULL))");
+            ErrorExitF("WideCharToMultiByte(codePage[%ud], WC_ERR_INVALID_CHARS, lpWStr->lpWCharArr[%ld], -1, lpCharArr, ulCharArrLen, NULL, NULL))", codePage, lpWStr->lpWCharArr);
         }
         assert(iCharArrLen == iCharArrLen2);
 
@@ -322,7 +320,7 @@ void WStrFileWrite(_In_ const wchar_t     *lpFilePath,
                        &numberOfBytesWritten,         // [out/opt] LPDWORD lpNumberOfBytesWritten
                        NULL))                         // [in/out/opt] LPOVERLAPPED lpOverlapped
         {
-            ErrorExit(L"WriteFile");
+            ErrorExit("WriteFile");
         }
 
         xfree((void **) &lpCharArr);
@@ -330,7 +328,7 @@ void WStrFileWrite(_In_ const wchar_t     *lpFilePath,
 
     if (!CloseHandle(hWriteFile))
     {
-        ErrorExit(L"CloseHandle(hWriteFile)");
+        ErrorExit("CloseHandle(hWriteFile)");
     }
 }
 
@@ -351,7 +349,7 @@ void WStrFileRead(_In_    const wchar_t *lpFilePath,
                                         NULL);                  // [in, optional] hTemplateFile
     if (INVALID_HANDLE_VALUE == hReadFile)
     {
-        ErrorExit(L"CreateFile(lpFilePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)");
+        ErrorExitF("CreateFile(lpFilePath[%ls], GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)", lpFilePath);
     }
 
     // Ref: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfilesize
@@ -359,14 +357,14 @@ void WStrFileRead(_In_    const wchar_t *lpFilePath,
     const DWORD dwFileSize = GetFileSize(hReadFile, lpdwHighFileSize);
     if (INVALID_FILE_SIZE == dwFileSize)
     {
-        ErrorExit(L"GetFileSize");
+        ErrorExitF("GetFileSize(lpFilePath:%ls)", lpFilePath);
     }
 
     if (0 == dwFileSize)
     {
         if (!CloseHandle(hReadFile))
         {
-            ErrorExit(L"CloseHandle(hReadFile)");
+            ErrorExitF("CloseHandle(hReadFile, lpFilePath:%ls)", lpFilePath);
         }
         return;
     }
@@ -380,38 +378,38 @@ void WStrFileRead(_In_    const wchar_t *lpFilePath,
     DWORD dwNumberOfBytesRead = 0;
     if (!ReadFile(hReadFile, lpCharArr, ulCharArrLen, &dwNumberOfBytesRead, NULL))
     {
-        ErrorExit(L"ReadFile");
+        ErrorExitF("ReadFile(lpFilePath:%ls)", lpFilePath);
     }
     assert(dwFileSize == dwNumberOfBytesRead);
     lpCharArr[dwNumberOfBytesRead] = '\0';
 
     if (!CloseHandle(hReadFile))
     {
-        ErrorExit(L"CloseHandle(hReadFile)");
+        ErrorExitF("CloseHandle(hReadFile, lpFilePath:%ls)", lpFilePath);
     }
 
     // Note: "BOM" == byte order mark
     // Ref: https://docs.microsoft.com/en-us/windows/win32/intl/using-byte-order-marks
     char *lpCharArrAfterBOM = lpCharArr;
-    if (dwFileSize >= 3 && 0xEF == lpCharArr[0] && 0xBB == lpCharArr[1] && 0xBF == lpCharArr[2])
+    if (dwFileSize >= 3 && ((char) 0xEF) == lpCharArr[0] && ((char) 0xBB) == lpCharArr[1] && ((char) 0xBF) == lpCharArr[2])
     {
         lpCharArrAfterBOM += 3;  // Skip UTF-8 BOM
     }
-    else if (dwFileSize >= 4 && 0xFF == lpCharArr[0] && 0xFE == lpCharArr[1] && 0x00 == lpCharArr[2] && 0x00 == lpCharArr[3])
+    else if (dwFileSize >= 4 && ((char) 0xFF) == lpCharArr[0] && ((char) 0xFE) == lpCharArr[1] && ((char) 0x00) == lpCharArr[2] && ((char) 0x00) == lpCharArr[3])
     {
-        ErrorExit(L"UTF-32LE (little endian) BOM (byte order mark) is not supported!");
+        ErrorExit("UTF-32LE (little endian) BOM (byte order mark) is not supported!");
     }
-    else if (dwFileSize >= 4 && 0x00 == lpCharArr[0] && 0x00 == lpCharArr[1] && 0xFF == lpCharArr[2] && 0xFE == lpCharArr[3])
+    else if (dwFileSize >= 4 && ((char) 0x00) == lpCharArr[0] && ((char) 0x00) == lpCharArr[1] && ((char) 0xFF) == lpCharArr[2] && ((char) 0xFE) == lpCharArr[3])
     {
-        ErrorExit(L"UTF-32BE (big endian) BOM (byte order mark) is not supported!");
+        ErrorExit("UTF-32BE (big endian) BOM (byte order mark) is not supported!");
     }
-    else if (dwFileSize >= 2 && 0xFF == lpCharArr[0] && 0xFE == lpCharArr[1])
+    else if (dwFileSize >= 2 && ((char) 0xFF) == lpCharArr[0] && ((char) 0xFE) == lpCharArr[1])
     {
-        ErrorExit(L"UTF-16LE (little endian) BOM (byte order mark) is not supported!");
+        ErrorExit("UTF-16LE (little endian) BOM (byte order mark) is not supported!");
     }
-    else if (dwFileSize >= 2 && 0xFE == lpCharArr[0] && 0xFF == lpCharArr[1])
+    else if (dwFileSize >= 2 && ((char) 0xFE) == lpCharArr[0] && ((char) 0xFF) == lpCharArr[1])
     {
-        ErrorExit(L"UTF-16BE (big endian) BOM (byte order mark) is not supported!");
+        ErrorExit("UTF-16BE (big endian) BOM (byte order mark) is not supported!");
     }
 
     // Ref: https://docs.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-multibytetowidechar
@@ -426,7 +424,7 @@ void WStrFileRead(_In_    const wchar_t *lpFilePath,
     assert(iWCharArrLen >= 0);
     if (0 == iWCharArrLen)
     {
-        ErrorExit(L"MultiByteToWideChar(codePage, MB_ERR_INVALID_CHARS, lpCharArrAfterBOM, -1, NULL, 0)");
+        ErrorExitF("MultiByteToWideChar(codePage[%ud], MB_ERR_INVALID_CHARS, lpCharArrAfterBOM, -1, NULL, 0)", codePage);
     }
 
     wchar_t* lpWCharArr = xcalloc(iWCharArrLen, sizeof(wchar_t));
@@ -441,7 +439,7 @@ void WStrFileRead(_In_    const wchar_t *lpFilePath,
     assert(iWCharArrLen2 >= 0);
     if (0 == iWCharArrLen2)
     {
-        ErrorExit(L"MultiByteToWideChar(codePage, MB_ERR_INVALID_CHARS, lpCharArrAfterBOM, lpWCharArr, iWCharArrLen)");
+        ErrorExitF("MultiByteToWideChar(codePage[%ud], MB_ERR_INVALID_CHARS, lpCharArrAfterBOM, lpWCharArr, iWCharArrLen)", codePage);
     }
     assert(iWCharArrLen == iWCharArrLen2);
 

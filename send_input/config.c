@@ -1,14 +1,15 @@
 #include "config.h"
 #include "error_exit.h"
 #include "xmalloc.h"
+#include "log.h"
 #include <assert.h>   // required for assert()
 #include <windows.h>
-#include <stdio.h>
 
 static void ConfigEntryDynArr_AssertValid(_In_ const struct ConfigEntryDynArr *lpDynArr)
 {
     assert(NULL != lpDynArr);
-    assert(lpDynArr->ulCapacity >= 0);
+    // Intentional: If ulCapacity is more that *half* of SIZE_MAX, there is probably an unsigned wrap bug.
+    assert(lpDynArr->ulCapacity <= SIZE_MAX / 2U);
     assert(lpDynArr->ulSize <= lpDynArr->ulCapacity);
 }
 
@@ -47,7 +48,7 @@ static void ConfigAssertValid(_In_ const struct ConfigEntryDynArr *lpDynArr)
 {
     if (0 == lpDynArr->ulSize)
     {
-        ErrorExit(L"Zero config entries found!");
+        ErrorExit("Zero config entries found!");
     }
 
     for (size_t i = 0; i < lpDynArr->ulSize; ++i)
@@ -59,10 +60,7 @@ static void ConfigAssertValid(_In_ const struct ConfigEntryDynArr *lpDynArr)
             if (lpEntry->shortcutKey.eModifiers == lpEntry2->shortcutKey.eModifiers
                 && lpEntry->shortcutKey.dwVkCode == lpEntry2->shortcutKey.dwVkCode)
             {
-                _snwprintf_s(g_lpErrorMsgBuffer, g_ulErrorMsgBufferSize, g_ulErrorMsgBufferSize,
-                             L"Config entries #%zd and #%zd have the same shortcut key\r\n", (1 + i), (1 + j));
-
-                ErrorExit(g_lpErrorMsgBuffer);
+                ErrorExitF("Config entries #%zd and #%zd have the same shortcut key\n", (1 + i), (1 + j));
             }
         }
     }
@@ -122,13 +120,9 @@ void ConfigParseLine(_In_  const size_t        ulLineIndex,
 
     if (1 == tokenWStrArr.ulSize)
     {
-        // Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/snprintf-s-snprintf-s-l-snwprintf-s-snwprintf-s-l
-        _snwprintf_s(g_lpErrorMsgBuffer, g_ulErrorMsgBufferSize, g_ulErrorMsgBufferSize,
-                     L"Config file: Line #%zd: Failed to find delim [%ls]\r\n"
-                     L"Line: %ls\r\n",
-                     (1 + ulLineIndex), lpDelimWCharArr, lpLineWStr->lpWCharArr);
-
-        ErrorExit(g_lpErrorMsgBuffer);
+        ErrorExitF("Config file: Line #%zd: Failed to find delim [%ls]\n"
+                   "Line: %ls\n",
+                   (1 + ulLineIndex), lpDelimWCharArr, lpLineWStr->lpWCharArr);
     }
 
     // Ex: L"Ctrl+Shift+Alt+0x70|username" -> L"Ctrl+Shift+Alt+0x70"
@@ -143,21 +137,15 @@ void ConfigParseLine(_In_  const size_t        ulLineIndex,
 
     if (0 == lpShortcutKeyWStr->ulSize)
     {
-        _snwprintf_s(g_lpErrorMsgBuffer, g_ulErrorMsgBufferSize, g_ulErrorMsgBufferSize,
-                     L"Config file: Line #%zd: Left side shortcut key is empty\r\n"
-                     L"Line: %ls\r\n",
-                     (1 + ulLineIndex), lpLineWStr->lpWCharArr);
-
-        ErrorExit(g_lpErrorMsgBuffer);
+        ErrorExitF("Config file: Line #%zd: Left side shortcut key is empty\n"
+                   "Line: %ls\n",
+                   (1 + ulLineIndex), lpLineWStr->lpWCharArr);
     }
     else if (0 == lpSendKeysWStr->ulSize)
     {
-        _snwprintf_s(g_lpErrorMsgBuffer, g_ulErrorMsgBufferSize, g_ulErrorMsgBufferSize,
-                     L"Config file: Line #%zd: Right side send keys text is empty\r\n"
-                     L"Line: %ls\r\n",
-                     (1 + ulLineIndex), lpLineWStr->lpWCharArr);
-
-        ErrorExit(g_lpErrorMsgBuffer);
+        ErrorExitF("Config file: Line #%zd: Right side send keys text is empty\n"
+                   "Line: %ls\n",
+                   (1 + ulLineIndex), lpLineWStr->lpWCharArr);
     }
 
     ConfigParseShortcutKey(lpShortcutKeyWStr, ulLineIndex, lpLineWStr, &(lpConfigEntry->shortcutKey));
@@ -168,6 +156,8 @@ void ConfigParseLine(_In_  const size_t        ulLineIndex,
     WStrCopyWStr(&(lpConfigEntry->sendKeysWStr), lpSendKeysWStr);
 
     WStrArrFree(&tokenWStrArr);
+
+    LogF(stdout, "Parsed config line #%d: [%ls]", (1 + ulLineIndex), lpLineWStr->lpWCharArr);
 }
 
 void ConfigParseShortcutKey(_In_  const struct WStr  *lpShortcutKeyWStr,  // Ex: L"Ctrl+Shift+Alt+0x70"
@@ -210,24 +200,17 @@ void ConfigParseShortcutKey(_In_  const struct WStr  *lpShortcutKeyWStr,  // Ex:
     // Note: Prefix '0x' and '0X' are automatically ignored.  Also, hex chars may be upper or lowercase.
     if (iFieldCount != swscanf(lpVkCodeWStr->lpWCharArr, L"%x", &dwVkCode))
     {
-        // Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/snprintf-s-snprintf-s-l-snwprintf-s-snwprintf-s-l
-        _snwprintf_s(g_lpErrorMsgBuffer, g_ulErrorMsgBufferSize, g_ulErrorMsgBufferSize,
-                     L"Config file: Line #%zd: Failed to parse virtual key code [%ls]\r\n"
-                     L"Line: %ls\r\n",
-                     (1 + ulLineIndex), lpVkCodeWStr->lpWCharArr, lpLineWStr->lpWCharArr);
-
-        ErrorExit(g_lpErrorMsgBuffer);
+        ErrorExitF("Config file: Line #%zd: Failed to parse virtual key code [%ls]\n"
+                   "Line: %ls\n",
+                   (1 + ulLineIndex), lpVkCodeWStr->lpWCharArr, lpLineWStr->lpWCharArr);
     }
 
     // Ref: https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
     if (dwVkCode < 0x01 || dwVkCode > 0xFE)
     {
-        _snwprintf_s(g_lpErrorMsgBuffer, g_ulErrorMsgBufferSize, g_ulErrorMsgBufferSize,
-                     L"Config file: Line #%zd: Invalid virtual key code [%ls]->%d: Min: 0x01 (1), Max: 0xFE (254)\r\n"
-                     L"Line: %ls\r\n",
-                     (1 + ulLineIndex), lpVkCodeWStr->lpWCharArr, dwVkCode, lpLineWStr->lpWCharArr);
-
-        ErrorExit(g_lpErrorMsgBuffer);
+        ErrorExitF("Config file: Line #%zd: Invalid virtual key code [%ls]->%d: Min: 0x01 (1), Max: 0xFE (254)\n"
+                   "Line: %ls\n",
+                   (1 + ulLineIndex), lpVkCodeWStr->lpWCharArr, dwVkCode, lpLineWStr->lpWCharArr);
     }
 
     WStrArrFree(&tokenWStrArr);
@@ -248,12 +231,9 @@ static BOOL ConfigParseModifier0(_In_    const wchar_t           *lpTokenWCharAr
     {
         if (0 != (eModifier & *peModifiers))
         {
-            _snwprintf_s(g_lpErrorMsgBuffer, g_ulErrorMsgBufferSize, g_ulErrorMsgBufferSize,
-                         L"Config file: Line #%zd: Multiple %ls modifiers are not allowed: [%ls]\r\n"
-                         L"Line: %ls\r\n",
-                         (1 + ulLineIndex), lpTokenWCharArr, lpShortcutKeyWStr->lpWCharArr, lpLineWStr->lpWCharArr);
-
-            ErrorExit(g_lpErrorMsgBuffer);
+            ErrorExitF("Config file: Line #%zd: Multiple %ls modifiers are not allowed: [%ls]\n"
+                       "Line: %ls\n",
+                       (1 + ulLineIndex), lpTokenWCharArr, lpShortcutKeyWStr->lpWCharArr, lpLineWStr->lpWCharArr);
         }
         *peModifiers |= eModifier;
         return TRUE;
@@ -274,15 +254,15 @@ void ConfigParseModifier(_In_    const struct WStr *lpTokenWStr,        // Ex: L
 
     if (0 == _wcsicmp(L"Shift", lpTokenWStr->lpWCharArr))
     {
-        ErrorExit(L"Shortcut key modifier 'Shift' is not supported.  Please use 'LShift' or 'RShift'.");
+        ErrorExit("Shortcut key modifier 'Shift' is not supported.  Please use 'LShift' or 'RShift'.");
     }
     if (0 == _wcsicmp(L"Ctrl", lpTokenWStr->lpWCharArr))
     {
-        ErrorExit(L"Shortcut key modifier 'Ctrl' is not supported.  Please use 'LCtrl' or 'RCtrl'.");
+        ErrorExit("Shortcut key modifier 'Ctrl' is not supported.  Please use 'LCtrl' or 'RCtrl'.");
     }
     if (0 == _wcsicmp(L"Alt", lpTokenWStr->lpWCharArr))
     {
-        ErrorExit(L"Shortcut key modifier 'Alt' is not supported.  Please use 'LAlt' or 'RAlt'.");
+        ErrorExit("Shortcut key modifier 'Alt' is not supported.  Please use 'LAlt' or 'RAlt'.");
     }
 
     if (!ConfigParseModifier0(L"LShift", SHIFT_LEFT , lpTokenWStr, lpShortcutKeyWStr, ulLineIndex, lpLineWStr, peModifiers)
@@ -292,13 +272,9 @@ void ConfigParseModifier(_In_    const struct WStr *lpTokenWStr,        // Ex: L
     &&  !ConfigParseModifier0(L"LAlt"  , ALT_LEFT   , lpTokenWStr, lpShortcutKeyWStr, ulLineIndex, lpLineWStr, peModifiers)
     &&  !ConfigParseModifier0(L"RAlt"  , ALT_RIGHT  , lpTokenWStr, lpShortcutKeyWStr, ulLineIndex, lpLineWStr, peModifiers))
     {
-        // Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/snprintf-s-snprintf-s-l-snwprintf-s-snwprintf-s-l
-        _snwprintf_s(g_lpErrorMsgBuffer, g_ulErrorMsgBufferSize, g_ulErrorMsgBufferSize,
-                     L"Config file: Line #%zd: Unknown modifier: [%ls]\r\n"
-                     L"Line: %ls\r\n",
-                     (1 + ulLineIndex), lpTokenWStr->lpWCharArr, lpLineWStr->lpWCharArr);
-
-        ErrorExit(g_lpErrorMsgBuffer);
+        ErrorExitF("Config file: Line #%zd: Unknown modifier: [%ls]\n"
+                   "Line: %ls\n",
+                   (1 + ulLineIndex), lpTokenWStr->lpWCharArr, lpLineWStr->lpWCharArr);
     }
 }
 
