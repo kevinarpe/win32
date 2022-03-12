@@ -1,15 +1,12 @@
 #!/usr/bin/env bash
 
-# Exit immediately if a command exits with a non-zero status.
-set -e
-# Treat unset variables as an error when substituting.
-set -u
-# The return value of a pipeline is the status of
-# the last command to exit with a non-zero status,
-# or zero if no command exited with a non-zero status
-set -o pipefail
-# Print commands and their arguments as they are executed.
-# set -x
+COMMON_DIR_PATH='../common'
+source "$(dirname "$0")/$COMMON_DIR_PATH/bashlib"
+
+TRUE=0
+FALSE=1
+
+ARG_REAL='--real'
 
 main()
 {
@@ -21,9 +18,20 @@ main()
     # Ex: '1.0'
     local version="$1" ; shift
 
+    local is_real=$FALSE
+    if [ 1 = $# ]
+    then
+        if [ "$ARG_REAL" = "$1" ]
+        then
+            is_real=$TRUE ; shift
+        else
+            printf -- '\nUnknown argument: [%s]\n' "$1"
+        fi
+    fi
+
     local orig_pwd="$(pwd)"
 
-    echo_and_run_cmd \
+    bashlib_echo_and_run_cmd \
         cd "$this_script_abs_dir_path"
 
     check_git_status_clean
@@ -38,63 +46,74 @@ main()
     # Ex: 'send_input-1.0.zip'
     local release_package_file_name="$release_dir_name.zip"
 
-    echo_and_run_cmd \
-        ./build.bash --release
+    bashlib_echo_and_run_cmd \
+        ./build.bash --clean --release
 
     if [ -d "release/$release_dir_name" ]
     then
-        echo_and_run_cmd \
+        bashlib_echo_and_run_cmd \
             /bin/rm -Rf "release/$release_dir_name"
     fi
 
-    echo_and_run_cmd \
+    bashlib_echo_and_run_cmd \
         mkdir --parents --verbose "release/$release_dir_name"
 
     local file_name
     for file_name in README.txt sample_config.txt
     do
-        echo_and_run_cmd \
+        bashlib_echo_and_run_cmd \
             cp --verbose "release/$file_name" "release/$release_dir_name/"
     done
 
-    echo_and_run_cmd \
+    bashlib_echo_and_run_cmd \
         cp --verbose "${package_name}.exe" "release/$release_dir_name/"
 
-    echo_and_run_cmd \
+    bashlib_echo_and_run_cmd \
         cd release
 
-    echo_and_run_cmd \
+    bashlib_echo_and_run_cmd \
         zip -v -r "$release_package_file_name" "$release_dir_name/"
 
-    echo_and_run_cmd \
+    bashlib_echo_and_run_cmd \
         unzip -v -l "$release_package_file_name"
 
-    echo_and_run_cmd \
+    bashlib_echo_and_run_cmd \
         ls -l "$release_package_file_name"
 
-    echo_and_run_cmd \
-        git tag "$release_dir_name"
+    if [ $TRUE = $is_real ]
+    then
+        bashlib_echo_and_run_cmd \
+            git tag "$release_dir_name"
 
-    echo_and_run_cmd \
-        git push --tags
+        bashlib_echo_and_run_cmd \
+            git push --tags
+    else
+        printf -- '\nDry run: Do not run git tag & push\n'
+    fi
 
-    echo_and_run_cmd \
+    bashlib_echo_and_run_cmd \
         cd "$orig_pwd"
 
-    printf -- '\nPlease upload this release to GitHub here: https://github.com/kevinarpe/win32/releases/new\n\n'
+    if [ $TRUE = $is_real ]
+    then
+        printf -- '\nPlease upload this release to GitHub here: https://github.com/kevinarpe/win32/releases/new\n\n'
+    fi
 }
 
 check_args()
 {
-    if [ 1 != $# ]
+    if [ 0 == $# ] || [ $# -gt 2 ]
     then
         printf -- '\n'
-        printf -- 'Usage: %s VERSION\n' "$0"
+        printf -- 'Usage: %s VERSION [%s]\n' "$0" "$ARG_REAL"
         printf -- 'Build latest code, then create release ZIP package\n'
         printf -- '\n'
         printf -- 'Required Arguments:\n'
         printf -- '    VERSION: Release version\n'
         printf -- '        Ex: 1.0\n'
+        printf -- '\n'
+        printf -- 'Required Arguments:\n'
+        printf -- '    %s: Run git tag & push; else, this is a dry run.\n' "$ARG_REAL"
         printf -- '\n'
         exit 1
     fi
@@ -112,35 +131,11 @@ check_git_status_clean()
         printf -- '$ git status\n'
         printf -- '... is not clean.  Please commit, then try again.\n'
 
-        echo_and_run_cmd \
+        bashlib_echo_and_run_cmd \
             git status
 
         exit 1
     fi
-}
-
-echo_cmd()
-{
-    echo
-    echo '$' "$@"
-}
-
-echo_and_run_cmd()
-{
-    echo_cmd "$@"
-    "$@"
-}
-
-echo_and_run_gcc_cmd()
-{
-    # Ref: https://stackoverflow.com/a/62488988/257299
-    echo_and_run_cmd \
-        x86_64-w64-mingw32-gcc \
-            -g3 -ggdb3 \
-            -Werror \
-            -Wl,-subsystem,windows \
-            -municode \
-            "$@"
 }
 
 main "$@"

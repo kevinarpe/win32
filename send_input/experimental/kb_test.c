@@ -1,4 +1,4 @@
-#include "win32_winver.h"
+#include "win32.h"
 #include "error_exit.h"
 #include <windows.h>
 #include <assert.h>
@@ -172,7 +172,7 @@ LRESULT CALLBACK LowLevelKeyboardProc(_In_ int    nCode,
 
         const DWORD dwThreadId = GetCurrentThreadId();
 
-        printf("dwThreadId: %d, eKeyModifiers: %d, wParam: %s, vkCode: 0x%X, IsExtended? %d, IsAltDown? %d, IsKeyUp? %d, Shift? %d, LShift? %d, RShift? %d, Ctrl? %d, LCtrl? %d, RCtrl? %d, Alt? %d, LAlt? %d, RAlt? %d\r\n",
+        printf("dwThreadId: %lu, eKeyModifiers: %d, wParam: %s, vkCode: 0x%lX, IsExtended? %d, IsAltDown? %d, IsKeyUp? %d, Shift? %d, LShift? %d, RShift? %d, Ctrl? %d, LCtrl? %d, RCtrl? %d, Alt? %d, LAlt? %d, RAlt? %d\r\n",
                dwThreadId, eKeyModifiers, lpWParamDesc, info->vkCode, bIsExtended, bIsAltDown, bIsKeyUp,
                bIsShiftKeyDown, bIsLShiftKeyDown, bIsRShiftKeyDown,
                bIsCtrlKeyDown, bIsLCtrlKeyDown, bIsRCtrlKeyDown,
@@ -216,10 +216,10 @@ LRESULT CALLBACK LowLevelKeyboardProc(_In_ int    nCode,
 
 // Ref: https://stackoverflow.com/a/13872211/257299
 // Ref: https://docs.microsoft.com/en-us/windows/win32/learnwin32/winmain--the-application-entry-point
-int WINAPI wWinMain(HINSTANCE hInstance,      // The operating system uses this value to identify the executable (EXE) when it is loaded in memory.
-                    HINSTANCE hPrevInstance,  // ... has no meaning. It was used in 16-bit Windows, but is now always zero.
-                    PWSTR     lpCmdLine,      // ... contains the command-line arguments as a Unicode string.
-                    int       nCmdShow)       // ... is a flag that says whether the main application window will be minimized, maximized, or shown normally.
+int WINAPI wWinMain(                        HINSTANCE hInstance,      // The operating system uses this value to identify the executable (EXE) when it is loaded in memory.
+                    __attribute__((unused)) HINSTANCE hPrevInstance,  // ... has no meaning. It was used in 16-bit Windows, but is now always zero.
+                    __attribute__((unused)) PWSTR     lpCmdLine,      // ... contains the command-line arguments as a Unicode string.
+                    __attribute__((unused)) int       nCmdShow)       // ... is a flag that says whether the main application window will be minimized, maximized, or shown normally.
 {
     // Ref: https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowshookexw
     const HHOOK hHook = SetWindowsHookEx(WH_KEYBOARD_LL,        // [in] int       idHook
@@ -228,15 +228,14 @@ int WINAPI wWinMain(HINSTANCE hInstance,      // The operating system uses this 
                                          (DWORD) 0);            // [in] DWORD     dwThreadId
     if (NULL == hHook)
     {
-        ErrorExit(L"SetWindowsHookEx(WH_KEYBOARD_LL, ...)");
+        ErrorExit("SetWindowsHookEx(WH_KEYBOARD_LL, ...)");
     }
 
     const DWORD dwThreadId = GetCurrentThreadId();
-    const DWORD z = HSHELL_WINDOWREPLACED;
 
     printf("Press any key combination to watch low level keyboard events\r\n");
     printf("Press Ctrl+C in this terminal to exit\r\n");
-    printf("dwThreadId: %d\r\n", dwThreadId);
+    printf("dwThreadId: %ld\r\n", dwThreadId);
     printf("\r\n");
 
     MSG msg = {};
@@ -249,7 +248,7 @@ int WINAPI wWinMain(HINSTANCE hInstance,      // The operating system uses this 
                                      0);    // [in]           UINT  wMsgFilterMax
         if (-1 == bRet)
         {
-            ErrorExit(L"GetMessage");
+            ErrorExit("GetMessage");
         }
 
         if (FALSE == bRet)
@@ -258,9 +257,13 @@ int WINAPI wWinMain(HINSTANCE hInstance,      // The operating system uses this 
         }
 
         // Ref: https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-translatemessage
-        const BOOL bRet2 = TranslateMessage(&msg);
-        const LRESULT lResult = DispatchMessage(&msg);
-        int dummy = 1;  // @DebugBreakpoint
+        __attribute__((unused)) const BOOL    bRet2   = TranslateMessage(&msg);
+
+        // Ref: https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-dispatchmessage
+        __attribute__((unused)) const LRESULT lResult = DispatchMessage(&msg);
+
+        #define DEBUG_BREAKPOINT do { __attribute__((unused)) int dummy = 1; } while (0)
+        DEBUG_BREAKPOINT;
     }
     // Return the exit code to the system from PostQuitMessage()
     return msg.wParam;

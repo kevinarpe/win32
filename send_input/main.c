@@ -9,8 +9,6 @@
 #include <wchar.h>
 #include <stdio.h>
 
-const int SHORT_MOST_SIGNIFICANT_BIT = 0x8000;
-
 struct ConfigEntryDynArr g_configEntryDynArr = {};
 
 enum EKeyModifier g_eKeyModifiers = 0;
@@ -295,10 +293,14 @@ int WINAPI wWinMain(                        HINSTANCE hInstance,      // The ope
 
         // Ref: https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-translatemessage
         __attribute__((unused)) const BOOL    bRet2   = TranslateMessage(&msg);
+
+        // Ref: https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-dispatchmessage
         __attribute__((unused)) const LRESULT lResult = DispatchMessage(&msg);
+
         #define DEBUG_BREAKPOINT do { __attribute__((unused)) int dummy = 1; } while (0)
         DEBUG_BREAKPOINT;
     }
+
     // Return the exit code to the system from PostQuitMessage()
     return msg.wParam;
 }

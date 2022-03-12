@@ -1,47 +1,17 @@
 #!/usr/bin/env bash
 
-# Exit immediately if a command exits with a non-zero status.
-set -e
-# Treat unset variables as an error when substituting.
-set -u
-# The return value of a pipeline is the status of
-# the last command to exit with a non-zero status,
-# or zero if no command exited with a non-zero status
-set -o pipefail
-# Print commands and their arguments as they are executed.
-# set -x
+COMMON_DIR_PATH='../common'
+source "$(dirname "$0")/$COMMON_DIR_PATH/bashlib"
 
 TRUE=0
 FALSE=1
 
+ARG_HELP='-h'
+ARG_HELP2='--help'
 ARG_CLEAN='--clean'
 ARG_RELEASE='--release'
 
 EXECUTABLE='send_input.exe'
-
-GCC_PREFIX='x86_64-w64-mingw32-'
-
-# Ex: 'x86_64-w64-mingw32-gcc'
-GCC="$GCC_PREFIX"'gcc'
-
-# Ex: 'x86_64-w64-mingw32-strip'
-STRIP="$GCC_PREFIX"'strip'
-
-is_linux()
-{
-    local uname
-    uname="$(uname)"
-    [ "Linux" = "$uname" ]
-}
-
-echo_exit_status()
-{
-    local exit_status
-    exit_status="$("$@")"
-    printf -- '%d' $?
-}
-
-IS_LINUX="$(echo_exit_status is_linux)"
 
 main()
 {
@@ -55,7 +25,7 @@ main()
     local arg
     for arg in "$@"
     do
-        if [ "-h" = "$arg" ] || [ "--help" = "$arg" ]
+        if [ "$ARG_HELP" = "$arg" ] || [ "$ARG_HELP2" = "$arg" ]
         then
             show_help_then_exit
 
@@ -91,70 +61,81 @@ main()
         printf -- '\nDebug build\n'
     fi
 
-    echo_and_run_cmd \
+    bashlib_echo_and_run_cmd \
         cd "$this_script_abs_dir_path"
+
+    build_common $is_clean
 
     if [ $TRUE = $is_clean ]
     then
-        echo_and_run_cmd \
+        bashlib_echo_and_run_cmd \
             rm -f *.o
     fi
 
-    echo_and_run_gcc_cmd_if_necessary \
-        win32.c win32.o
+    # Note: -iquote is more specific than -I
+    bashlib_echo_and_run_gcc_cmd_if_necessary \
+        config.c config.o -iquote "$COMMON_DIR_PATH"
 
-    echo_and_run_gcc_cmd_if_necessary \
-        log.c log.o
+    bashlib_echo_and_run_gcc_cmd_if_necessary \
+        main.c main.o -iquote "$COMMON_DIR_PATH"
 
-    echo_and_run_gcc_cmd_if_necessary \
-        error_exit.c error_exit.o
+    bashlib_echo_and_run_gcc_cmd \
+        -o "$EXECUTABLE" \
+        "$COMMON_DIR_PATH/win32.o" \
+        "$COMMON_DIR_PATH/log.o" \
+        "$COMMON_DIR_PATH/error_exit.o" \
+        "$COMMON_DIR_PATH/win32_xmalloc.o" \
+        "$COMMON_DIR_PATH/wstr.o" \
+        "$COMMON_DIR_PATH/min_max.o" \
+        "$COMMON_DIR_PATH/console.o" \
+        config.o main.o -lgdi32
 
-    echo_and_run_gcc_cmd_if_necessary \
-        win32_xmalloc.c win32_xmalloc.o
-
-    echo_and_run_gcc_cmd_if_necessary \
-        wstr.c wstr.o
-
-    echo_and_run_gcc_cmd_if_necessary \
-        config.c config.o
-
-    echo_and_run_gcc_cmd_if_necessary \
-        min_max.c min_max.o
-
-    echo_and_run_gcc_cmd_if_necessary \
-        console.c console.o
-
-    echo_and_run_gcc_cmd_if_necessary \
-        main.c main.o
-
-    echo_and_run_gcc_cmd \
-        -o send_input.exe win32.o log.o error_exit.o win32_xmalloc.o wstr.o config.o min_max.o console.o main.o -lgdi32
-
-    echo_and_run_cmd \
-        ls -l send_input.exe
+    bashlib_echo_and_run_cmd \
+        ls -l "$EXECUTABLE"
 
     if [ $TRUE = $is_release ]
     then
-        echo_and_run_cmd \
-            "$STRIP" --verbose send_input.exe
+        bashlib_echo_and_run_strip_cmd \
+            --verbose "$EXECUTABLE"
 
-        echo_and_run_cmd \
-            ls -l send_input.exe
+        bashlib_echo_and_run_cmd \
+            ls -l "$EXECUTABLE"
     fi
 
-    echo_and_run_cmd \
+    bashlib_echo_and_run_cmd \
         cd -
 
     printf -- '\n'
     printf -- 'Try the new executable:\n'
-    printf -- '$ wine send_input.exe release/sample_config.txt\n'
+
+    local exec2="$EXECUTABLE"
+    if [ $TRUE = $BASHLIB_IS_LINUX ]
+    then
+        exec2="wine $exec2"
+    fi
+
+    printf -- '$ %s release/sample_config.txt\n' "$exec2"
     printf -- '\n'
+}
+
+build_common()
+{
+    local is_clean="$1" ; shift
+
+    local arg_arr=()
+    if [ $TRUE = $is_clean ]
+    then
+        arg_arr=("$ARG_CLEAN")
+    fi
+
+    bashlib_echo_and_run_cmd \
+        "$COMMON_DIR_PATH/build.bash" "${arg_arr[@]}"
 }
 
 show_help_then_exit()
 {
     printf -- '\n'
-    printf -- 'Usage: %s [%s] [%s] [-h|--help]\n' "$0" "$ARG_CLEAN" "$ARG_RELEASE"
+    printf -- 'Usage: %s [%s] [%s] [%s|%s]\n' "$0" "$ARG_CLEAN" "$ARG_RELEASE" "$ARG_HELP" "$ARG_HELP2"
     printf -- 'Build executable (debug or release): %s\n' "$EXECUTABLE"
     printf -- '\n'
     printf -- 'Required Arguments:\n'
@@ -165,64 +146,12 @@ show_help_then_exit()
     printf -- '\n'
     printf -- '    %s: Strip final executable\n' "$ARG_RELEASE"
     printf -- '\n'
-    printf -- '    -h or --help: Show this help\n'
+    printf -- '    %s or %s: Show this help\n' "$ARG_HELP" "$ARG_HELP2"
     printf -- '\n'
     printf -- 'Compatibility Notes:\n'
     printf -- '    This Bash shell script is compatible with Linux, Cygwin, and MSYS2\n'
     printf -- '\n'
     exit 1
-}
-
-echo_cmd()
-{
-    echo
-    echo '$' "$@"
-}
-
-echo_and_run_cmd()
-{
-    echo_cmd "$@"
-    "$@"
-}
-
-echo_and_run_gcc_cmd()
-{
-    local arg_arr=()
-    if [ $TRUE = $IS_LINUX ]
-    then
-        # Normally, 'winegcc' defines this auto-magically.
-        arg_arr+=(-D__WINE__)
-    fi
-    # Ref: https://stackoverflow.com/a/62488988/257299
-    echo_and_run_cmd \
-        "$GCC" \
-            "${arg_arr[@]}" \
-            -g3 -ggdb3 \
-            -Wall -Wextra -Wshadow \
-            -Werror \
-            -Wl,-subsystem,windows \
-            -municode \
-            "$@"
-}
-
-echo_and_run_gcc_cmd_if_necessary()
-{
-    # Ex: 'error_exit.c'
-    local input_file_path="$1"; shift
-
-    # Ex: 'error_exit.o'
-    local output_file_path="$1"; shift
-
-    # Remaining args stored in "$@"
-
-    # $ help test -> "FILE1 -nt FILE2: True if file1 is newer than file2 (according to modification date)."
-    if [ "$input_file_path" -nt "$output_file_path" ]
-    then
-        echo_and_run_gcc_cmd \
-            -c -o "$output_file_path" "$input_file_path" "$@"
-    else
-        printf -- '\n%s: Not updated (do not re-compile)\n' "$input_file_path"
-    fi
 }
 
 main "$@"
