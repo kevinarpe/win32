@@ -13,8 +13,14 @@ set -o pipefail
 # Print commands and their arguments as they are executed.
 # set -x
 
-__BASHLIB_TRUE=0
-__BASHLIB_FALSE=1
+BASHLIB_TRUE=0
+BASHLIB_FALSE=1
+
+BASHLIB_ARG_HELP='-h'
+BASHLIB_ARG_HELP2='--help'
+BASHLIB_ARG_CLEAN='--clean'
+BASHLIB_ARG_RELEASE='--release'
+BASHLIB_ARG_COMMON='--common'
 
 __BASHLIB_GCC='x86_64-w64-mingw32-gcc'
 __BASHLIB_STRIP='x86_64-w64-mingw32-strip'
@@ -39,37 +45,65 @@ __bashlib_echo_exit_status()
 
 BASHLIB_IS_LINUX="$(__bashlib_echo_exit_status __bashlib_is_linux)"
 
-bashlib_echo_cmd()
+bashlib_logf()
 {
-    echo
-    echo '$' "$@"
+    # Ex: '2022-03-13 21:57:16.452 +08:00'
+    local timestamp="$(date '+%Y-%m-%d %H:%M:%S.%3N %:z')"
+
+    printf -- '\n%s: %s: ' "$timestamp" "$0"
+    printf -- "$@"
+    printf -- '\n'
 }
 
-bashlib_echo_and_run_cmd()
+bashlib_log_cmd()
 {
-    bashlib_echo_cmd "$@"
+    bashlib_logf '$ %s' "$*"
+}
+
+bashlib_log_and_run_cmd()
+{
+    bashlib_log_cmd "$@"
     "$@"
 }
 
-bashlib_echo_and_run_strip_cmd()
+bashlib_log_and_run_strip_cmd()
 {
-    bashlib_echo_and_run_cmd \
+    bashlib_log_and_run_cmd \
         "$__BASHLIB_STRIP" "$@"
 }
 
-bashlib_echo_and_run_gcc_cmd()
+bashlib_log_and_run_gcc_cmd()
 {
+    # Ex: $BASHLIB_TRUE or $BASHLIB_FALSE
+    local is_release="$1" ; shift
+
+    if [ $BASHLIB_TRUE != $is_release ] && [ $BASHLIB_FALSE != $is_release ]
+    then
+        bashlib_logf "Internal error: bashlib_log_and_run_gcc_cmd(): is_release has value [%s] but must be %d or %d" \
+                     "$is_release" $BASHLIB_TRUE $BASHLIB_FALSE
+        exit 1
+    fi
+
     local arg_arr=()
-    if [ $__BASHLIB_TRUE = $BASHLIB_IS_LINUX ]
+    if [ $BASHLIB_TRUE = $BASHLIB_IS_LINUX ]
     then
         # Normally, 'winegcc' defines this auto-magically.
         arg_arr+=(-D__WINE__)
     fi
+
+    if [ $BASHLIB_TRUE = $is_release ]
+    then
+        # Max optimization
+        arg_arr+=(-O3 -DNDEBUG)
+    else
+        # Optimization disabled and max debug into
+        arg_arr+=(-O0 -g3 -ggdb3)
+    fi
+
     # Ref: https://stackoverflow.com/a/62488988/257299
-    bashlib_echo_and_run_cmd \
+    bashlib_log_and_run_cmd \
         "$__BASHLIB_GCC" \
             "${arg_arr[@]}" \
-            -g3 -ggdb3 \
             -Wall -Wextra -Wshadow \
             -Werror \
             -Wl,-subsystem,windows \
@@ -77,8 +111,27 @@ bashlib_echo_and_run_gcc_cmd()
             "$@"
 }
 
-bashlib_echo_and_run_gcc_cmd_if_necessary()
+bashlib_if_inputs_newer_than_output()
 {
+    local output_file_path="$1" ; shift
+    # Remaining args: input_file_path: "$@"
+    while [ 0 != $# ]
+    do
+        local input_file_path="$1" ; shift
+        if [ -f "$input_file_path" ] \
+        && [ "$input_file_path" -nt "$output_file_path" ] 
+        then
+            return $BASHLIB_TRUE
+        fi
+    done
+    return $BASHLIB_FALSE
+}
+
+bashlib_log_and_run_gcc_cmd_if_necessary()
+{
+    # Ex: $BASHLIB_TRUE or $BASHLIB_FALSE
+    local is_release="$1" ; shift
+
     # Ex: 'error_exit.c'
     local input_file_path="$1"; shift
 
@@ -90,10 +143,10 @@ bashlib_echo_and_run_gcc_cmd_if_necessary()
     # $ help test -> "FILE1 -nt FILE2: True if file1 is newer than file2 (according to modification date)."
     if [ "$input_file_path" -nt "$output_file_path" ]
     then
-        bashlib_echo_and_run_gcc_cmd \
-            -c -o "$output_file_path" "$input_file_path" "$@"
+        bashlib_log_and_run_gcc_cmd \
+            "$is_release" -c -o "$output_file_path" "$input_file_path" "$@"
     else
-        printf -- '\n%s: Not updated (do not re-compile)\n' "$input_file_path"
+        bashlib_logf '%s: Input file not updated: Do not re-compile' "$input_file_path"
     fi
 }
 

@@ -3,7 +3,8 @@
 #include <assert.h>
 #include <stdlib.h>  // required for abs()
 
-static void static_fprintf_prefix(FILE *fp)
+static void
+LogPrefix(FILE *fp)
 {
     assert(NULL != fp);
 
@@ -13,7 +14,8 @@ static void static_fprintf_prefix(FILE *fp)
     if (!bIsInitDone)
     {
         // Ref: https://docs.microsoft.com/en-us/windows/win32/api/timezoneapi/nf-timezoneapi-gettimezoneinformation
-        __attribute__((unused)) const DWORD dw = GetTimeZoneInformation(&tz);
+        __attribute__((unused))
+        const DWORD dw = GetTimeZoneInformation(&tz);
         bIsInitDone = TRUE;
     }
 
@@ -27,8 +29,8 @@ static void static_fprintf_prefix(FILE *fp)
     // ... thus, JST bias will be *negative*.
 
     const char plusMinus = (tz.Bias <= 0) ? '+' : '-';
-    const int hours   = abs(tz.Bias) / 60;
-    const int minutes = abs(tz.Bias) % 60;
+    const int  hours     = abs(tz.Bias) / 60;
+    const int  minutes   = abs(tz.Bias) % 60;
 
     // Ex: "2022-03-10 22:17:47.123 +09:00 "
     fprintf(fp,
@@ -37,47 +39,53 @@ static void static_fprintf_prefix(FILE *fp)
             plusMinus, hours, minutes);
 }
 
-void Log(FILE *fp, const char *lpszMsg)
+void
+LogW(FILE          *fp,
+     // @EmptyStringAllowed
+     const wchar_t *lpszMsg)
 {
     assert(NULL != fp);
     assert(NULL != lpszMsg);
 
-    static_fprintf_prefix(fp);
-    fputs(lpszMsg, fp);
-    fputs("\n", fp);
+    LogPrefix(fp);
+    // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/fputs-fputws?view=msvc-170
+    fputws(lpszMsg, fp);
 }
 
-void LogF(FILE *fp, const char *lpszMsgFmt, ...)
+void
+LogWF(FILE          *fp,
+      // @EmptyStringAllowed
+      const wchar_t *lpszMsgFmt, ...)
 {
     assert(NULL != fp);
     assert(NULL != lpszMsgFmt);
 
-    static_fprintf_prefix(fp);
+    LogPrefix(fp);
 
     // Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/va-arg-va-copy-va-end-va-start?view=msvc-170
     va_list ap;
     va_start(ap, lpszMsgFmt);
-
-    vfprintf(fp, lpszMsgFmt, ap);
-    fputs("\n", fp);
-
+    // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/vfprintf-vfprintf-l-vfwprintf-vfwprintf-l?view=msvc-170
+    vfwprintf(fp, lpszMsgFmt, ap);
     va_end(ap);
 }
 
-void LogFV(FILE *fp, const char *lpszMsgFmt, va_list ap)
+void
+LogWFV(FILE          *fp,
+       // @EmptyStringAllowed
+       const wchar_t *lpszMsgFmt,
+       va_list        ap)
 {
     assert(NULL != fp);
     assert(NULL != lpszMsgFmt);
 
-    static_fprintf_prefix(fp);
+    LogPrefix(fp);
 
     // Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/va-arg-va-copy-va-end-va-start?view=msvc-170
     va_list ap_copy;
     va_copy(ap_copy, ap);
-
-    vfprintf(fp, lpszMsgFmt, ap_copy);
-    fputs("\n", fp);
-
+    // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/vfprintf-vfprintf-l-vfwprintf-vfwprintf-l?view=msvc-170
+    vfwprintf(fp, lpszMsgFmt, ap_copy);
     va_end(ap_copy);
 }
 

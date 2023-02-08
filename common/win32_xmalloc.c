@@ -3,18 +3,21 @@
 #include <assert.h>
 #include <windows.h>
 
-static HANDLE StaticGetProcessHeap()
+static HANDLE
+StaticGetProcessHeap()
 {
     // Ref: https://docs.microsoft.com/en-us/windows/win32/api/heapapi/nf-heapapi-getprocessheap
     const HANDLE hProcessHeap = GetProcessHeap();
     if (NULL == hProcessHeap)
     {
-        ErrorExit("GetProcessHeap()");
+        ErrorExitW(L"GetProcessHeap()");
     }
     return hProcessHeap;
 }
 
-void *xcalloc(size_t ulNumItem, size_t ulSizeOfEachItem)
+void *
+xcalloc(_In_ const size_t ulNumItem,
+        _In_ const size_t ulSizeOfEachItem)
 {
     assert(ulNumItem > 0);
     assert(ulSizeOfEachItem > 0);
@@ -28,7 +31,9 @@ void *xcalloc(size_t ulNumItem, size_t ulSizeOfEachItem)
     return lpData;
 }
 
-void xrealloc(void **lppData, size_t ulNewDataSize)
+void
+xrealloc(_Inout_ void         **lppData,
+         _In_    const size_t   ulNewDataSize)
 {
     assert(NULL != lppData);
     assert(NULL != *lppData);
@@ -44,7 +49,8 @@ void xrealloc(void **lppData, size_t ulNewDataSize)
     *lppData = lpData;
 }
 
-void xfree(void **lppData)
+void
+xfree(_Inout_ void **lppData)
 {
     assert(NULL != lppData);
 
@@ -55,7 +61,7 @@ void xfree(void **lppData)
         // Ref: https://docs.microsoft.com/en-us/windows/win32/api/heapapi/nf-heapapi-heapfree
         if (!HeapFree(hProcessHeap, 0, *lppData))
         {
-            ErrorExit("HeapFree(hProcessHeap, 0, *lppData)");
+            ErrorExitW(L"HeapFree(hProcessHeap, 0, *lppData)");
         }
         *lppData = NULL;
     }

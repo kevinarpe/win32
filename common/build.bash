@@ -2,9 +2,6 @@
 
 source "$(dirname "$0")"/bashlib
 
-TRUE=0
-FALSE=1
-
 ARG_HELP='-h'
 ARG_HELP2='--help'
 ARG_CLEAN='--clean'
@@ -14,22 +11,34 @@ main()
     local this_script_abs_dir_path
     this_script_abs_dir_path="$(dirname "$(readlink --canonicalize "$0")")"
 
-    local is_clean=$FALSE
+    # Intentional: By default, build debug executable.
+    local is_release=$BASHLIB_FALSE
+    local is_clean=$BASHLIB_FALSE
 
     local arg
     for arg in "$@"
     do
-        if [ "$ARG_HELP" = "$arg" ] || [ "$ARG_HELP2" = "$arg" ]
+        if [ "$BASHLIB_ARG_HELP" = "$arg" ] || [ "$BASHLIB_ARG_HELP2" = "$arg" ]
         then
             show_help_then_exit
 
-        elif [ "$ARG_CLEAN" = "$arg" ]
+        elif [ "$BASHLIB_ARG_CLEAN" = "$arg" ]
         then
-            if [ $FALSE = $is_clean ]
+            if [ $BASHLIB_FALSE = $is_clean ]
             then
-                is_clean=$TRUE
+                is_clean=$BASHLIB_TRUE
             else
-                printf -- '\nError: Found multiple %s arguments\n' "$ARG_CLEAN"
+                printf -- '\nError: Found multiple %s arguments\n' "$BASHLIB_ARG_CLEAN"
+                show_help_then_exit
+            fi
+
+        elif [ "$BASHLIB_ARG_RELEASE" = "$arg" ]
+        then
+            if [ $BASHLIB_FALSE = $is_release ]
+            then
+                is_release=$BASHLIB_TRUE
+            else
+                printf -- '\nError: Found multiple %s arguments\n' "$BASHLIB_ARG_RELEASE"
                 show_help_then_exit
             fi
         else
@@ -38,39 +47,51 @@ main()
         fi
     done
 
-    bashlib_echo_and_run_cmd \
+    if [ $BASHLIB_TRUE = $is_release ]
+    then
+        bashlib_logf 'Release build'
+    else
+        bashlib_logf 'Debug build'
+    fi
+
+    bashlib_log_and_run_cmd \
         cd "$this_script_abs_dir_path"
 
-    if [ $TRUE = $is_clean ]
+    if [ $BASHLIB_TRUE = $is_clean ]
     then
-        bashlib_echo_and_run_cmd \
+        bashlib_log_and_run_cmd \
             rm -f *.o
     fi
 
-    local bname
-    for bname in win32 log error_exit win32_xmalloc wstr min_max console
+    local csrc
+    for csrc in *.c
     do
-        bashlib_echo_and_run_gcc_cmd_if_necessary \
-            $bname.c $bname.o
+        local bname
+        # Ex: "wstr.c" -> "wstr"
+        bname="$(basename "$csrc" '.c')"
+        bashlib_log_and_run_gcc_cmd_if_necessary \
+            "$is_release" "$bname.c" "$bname.o"
     done
 
-    bashlib_echo_and_run_cmd \
+    bashlib_log_and_run_cmd \
         cd -
 }
 
 show_help_then_exit()
 {
     printf -- '\n'
-    printf -- 'Usage: %s [%s] [%s|%s]\n' "$0" "$ARG_CLEAN" "$ARG_HELP" "$ARG_HELP2"
+    printf -- 'Usage: %s [%s] [%s] [%s|%s]\n' "$0" "$BASHLIB_ARG_CLEAN" "$BASHLIB_ARG_RELEASE" "$BASHLIB_ARG_HELP" "$BASHLIB_ARG_HELP2"
     printf -- 'Build common libraries\n'
     printf -- '\n'
     printf -- 'Required Arguments:\n'
     printf -- '    None\n'
     printf -- '\n'
     printf -- 'Optional Arguments:\n'
-    printf -- '    %s: Remove object files to force full rebuild\n' "$ARG_CLEAN"
+    printf -- '    %s: Remove object files to force full rebuild\n' "$BASHLIB_ARG_CLEAN"
     printf -- '\n'
-    printf -- '    %s or %s: Show this help\n' "$ARG_HELP" "$ARG_HELP2"
+    printf -- '    %s: Strip final executable\n' "$BASHLIB_ARG_RELEASE"
+    printf -- '\n'
+    printf -- '    %s or %s: Show this help\n' "$BASHLIB_ARG_HELP" "$BASHLIB_ARG_HELP2"
     printf -- '\n'
     printf -- 'Compatibility Notes:\n'
     printf -- '    This Bash shell script is compatible with Linux, Cygwin, and MSYS2\n'

@@ -1,10 +1,33 @@
 #include "wstr.h"
 #include "error_exit.h"
 #include "xmalloc.h"
+#include "log.h"
 #include <assert.h>
 #include <windows.h>
+#include <errno.h>
 
-void WStrAssertValid(_In_ const struct WStr *lpWStr)
+void
+SafeWCharArrCopy(_Out_ wchar_t       *lpDestWCharArr,                // dest wstr ptr
+                 _In_  size_t         ulDestWCharArrLenPlusNulChar,  // dest wstr length (including null char)
+                 _In_  const wchar_t *lpSrcWCharArr,                 // source wstr ptr
+                 _In_  const size_t   ulWCharCount)                  // wchar count to be copied (excluding null char)
+{
+    // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/strncpy-s-strncpy-s-l-wcsncpy-s-wcsncpy-s-l-mbsncpy-s-mbsncpy-s-l?view=msvc-170
+    const errno_t e = wcsncpy_s(lpDestWCharArr,
+                                ulDestWCharArrLenPlusNulChar,
+                                lpSrcWCharArr,
+                                ulWCharCount);
+    if (0 != e)
+    {
+        // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/strerror-strerror-wcserror-wcserror?view=msvc-170
+        const wchar_t *lpErrWCharArr = _wcserror(e);
+        ErrorExitWF(L"Fatal error: wcsncpy_s(..., ulDestWCharArrLenPlusNulChar[%zd], lpSrcWCharArr[%ls], ulWCharCount[%zd]) -> %d: [%ls]",
+                    ulDestWCharArrLenPlusNulChar, lpSrcWCharArr, ulWCharCount, e, lpErrWCharArr);
+    }
+}
+
+void
+WStrAssertValid(_In_ const struct WStr *lpWStr)
 {
     assert(NULL != lpWStr);
     if (lpWStr->ulSize > 0)
@@ -13,7 +36,8 @@ void WStrAssertValid(_In_ const struct WStr *lpWStr)
     }
 }
 
-void WStrFree(_Inout_ struct WStr *lpWStr)
+void
+WStrFree(_Inout_ struct WStr *lpWStr)
 {
     WStrAssertValid(lpWStr);
 
@@ -21,50 +45,242 @@ void WStrFree(_Inout_ struct WStr *lpWStr)
     lpWStr->ulSize = 0;  // Explicit
 }
 
-static void InternalWStrCopyWCharArr(_Inout_ struct WStr   *lpDestWStr,
-                                     _In_    const wchar_t *lpSrcWCharArr,
-                                     _In_    const size_t   ulSrcSize)
+BOOL
+WStrIsEmpty(_In_ const struct WStr *lpWStr)
+{
+    WStrAssertValid(lpWStr);
+
+    const BOOL x = (0 == lpWStr->ulSize);
+    return x;
+}
+
+int
+WStrCompare(_In_ const struct WStr *lpWStrLeft,
+            _In_ const struct WStr *lpWStrRight)
+{
+    WStrAssertValid(lpWStrLeft);
+    WStrAssertValid(lpWStrRight);
+
+    const wchar_t *lpLeftWCharArr  = (0 == lpWStrLeft->ulSize ) ? L"" : lpWStrLeft->lpWCharArr;
+    const wchar_t *lpRightWCharArr = (0 == lpWStrRight->ulSize) ? L"" : lpWStrRight->lpWCharArr;
+
+    const int cmp = wcscmp(lpLeftWCharArr, lpRightWCharArr);
+    return cmp;
+}
+
+static void
+WStrCopyWCharArr0(_Inout_ struct WStr   *lpDestWStr,
+                  _In_    const wchar_t *lpSrcWCharArr,
+                  _In_    const size_t   ulSrcSize)
 {
     WStrFree(lpDestWStr);
-    // Intentional: Allow NULL here
-//    assert(NULL != lpSrcWCharArr);
+    // Intentional: Allow (NULL == lpSrcWCharArr)
 
     lpDestWStr->ulSize = ulSrcSize;
     if (0 == ulSrcSize) {
         return;
     }
 
-    lpDestWStr->lpWCharArr = xcalloc(lpDestWStr->ulSize + LEN_NULL_CHAR, sizeof(wchar_t));
+    lpDestWStr->lpWCharArr = xcalloc(lpDestWStr->ulSize + LEN_NUL_CHAR, sizeof(wchar_t));
 
-    wcsncpy_s(lpDestWStr->lpWCharArr,              // dest wstr ptr
-              lpDestWStr->ulSize + LEN_NULL_CHAR,  // dest wstr length (including null char)
-              lpSrcWCharArr,                       // source wstr ptr
-              ulSrcSize);                          // wchar count to be copied (excluding null char)
+    SafeWCharArrCopy(lpDestWStr->lpWCharArr,
+                     lpDestWStr->ulSize + LEN_NUL_CHAR,
+                     lpSrcWCharArr,
+                     ulSrcSize);
 }
 
-void WStrCopyWCharArr(_Inout_ struct WStr   *lpDestWStr,
-                      _In_    const wchar_t *lpSrcWCharArr,
-                      _In_    const size_t   ulSrcSize)
+void
+WStrCopyWCharArr(_Inout_ struct WStr   *lpDestWStr,
+                 _In_    const wchar_t *lpSrcWCharArr,
+                 _In_    const size_t   ulSrcSize)
 {
-    assert(NULL != lpSrcWCharArr);
+//    assert(NULL != lpSrcWCharArr);
+    if (NULL == lpSrcWCharArr)
+    {
+        assert(0 == ulSrcSize);
+    }
 
-    InternalWStrCopyWCharArr(lpDestWStr, lpSrcWCharArr, ulSrcSize);
+    WStrCopyWCharArr0(lpDestWStr, lpSrcWCharArr, ulSrcSize);
 }
 
-void WStrCopyWStr(_Inout_ struct WStr       *lpDestWStr,
-                  _In_    const struct WStr *lpSrcWStr)
+void
+WStrCopyWStr(_Inout_ struct WStr       *lpDestWStr,
+             _In_    const struct WStr *lpSrcWStr)
 {
     WStrAssertValid(lpSrcWStr);
 
-    InternalWStrCopyWCharArr(lpDestWStr, lpSrcWStr->lpWCharArr, lpSrcWStr->ulSize);
+    WStrCopyWCharArr0(lpDestWStr, lpSrcWStr->lpWCharArr, lpSrcWStr->ulSize);
 }
 
-void WStrTrim(_Inout_ struct WStr                 *lpWStr,
-              _In_    const enum EWStrTrim         eWStrTrim,
-              _In_    const WStrCharPredicateFunc  fpWStrCharPredicateFunc)
+void
+WStrSprintf(_Inout_ struct WStr   *lpDestWStr,
+            // @EmptyStringAllowed
+            _In_    const wchar_t *lpFormatWCharArr, ...)
+{
+    // Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/va-arg-va-copy-va-end-va-start?view=msvc-172
+    va_list ap;
+    va_start(ap, lpFormatWCharArr);
+    WStrSprintfV(lpDestWStr, lpFormatWCharArr, ap);
+    va_end(ap);
+}
+
+void
+WStrSprintfV(_Inout_ struct WStr   *lpDestWStr,
+             // @EmptyStringAllowed
+             _In_    const wchar_t *lpFormatWCharArr,
+             _In_    va_list        ap)
+{
+    WStrFree(lpDestWStr);
+    assert(NULL != lpFormatWCharArr);
+
+    // Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/va-arg-va-copy-va-end-va-start?view=msvc-172
+    va_list ap_copy;
+    va_copy(ap_copy, ap);
+
+    // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/vsprintf-vsprintf-l-vswprintf-vswprintf-l-vswprintf-l?view=msvc-170
+    // Ref: https://en.cppreference.com/w/c/io/vfwprintf
+    // "Writes the results to a wide string buffer. At most bufsz-1 wide characters are written followed by null wide character.
+    //  The resulting wide character string will be terminated with a null wide character, unless bufsz is zero."
+    // "The number of wide characters written if successful or negative value if an error occurred.
+    //  If the resulting string gets truncated due to bufsz limit, function returns the total number of characters
+    //  (not including the terminating null wide character) which would have been written, if the limit were not imposed."
+    const int cch = vswprintf(NULL,                      // wchar_t *buffer
+                              0,                         // size_t bufsz
+                              lpFormatWCharArr,  // const wchar_t *format
+                              ap_copy);                  // va_list vlist
+    va_end(ap_copy);
+
+    if (cch < 0)
+    {
+        ErrorExitWF(L"Internal error: -1 == vswprintf(NULL, 0, lpFormatWCharArr[%ls], ap_copy)", lpFormatWCharArr);
+    }
+
+    lpDestWStr->ulSize = cch;
+    lpDestWStr->lpWCharArr = xcalloc(lpDestWStr->ulSize + LEN_NUL_CHAR, sizeof(wchar_t));
+
+    va_list ap_copy2;
+    va_copy(ap_copy2, ap);
+
+    const int cch2 = vswprintf(lpDestWStr->lpWCharArr,             // wchar_t *buffer
+                               lpDestWStr->ulSize + LEN_NUL_CHAR,  // size_t bufsz
+                               lpFormatWCharArr,           // const wchar_t *format
+                               ap_copy2);                          // va_list vlist
+    va_end(ap_copy2);
+
+    if (cch2 < 0)
+    {
+        ErrorExitWF(L"Internal error: -1 == vswprintf(lpDestWStr->lpWCharArr, lpDestWStr->ulSize + LEN_NUL_CHAR[%zd], lpFormatWCharArr[%ls], ap_copy)",
+                   lpDestWStr->ulSize + LEN_NUL_CHAR, lpFormatWCharArr);
+    }
+
+    if (cch != cch2)
+    {
+        ErrorExitWF(L"Internal error: cch[%d] != cch2[%d]", cch, cch2);
+    }
+}
+
+void
+WStrConcat(_Inout_ struct WStr       *lpDestWStr,
+           _In_    const struct WStr *lpSrcWStr,
+           _In_    const struct WStr *lpSrcWStr2)
+{
+    WStrAssertValid(lpSrcWStr);
+    WStrAssertValid(lpSrcWStr2);
+
+    WStrFree(lpDestWStr);
+
+    lpDestWStr->ulSize = lpSrcWStr->ulSize + lpSrcWStr2->ulSize;
+    if (0 == lpDestWStr->ulSize) {
+        return;
+    }
+
+    lpDestWStr->lpWCharArr = xcalloc(lpDestWStr->ulSize + LEN_NUL_CHAR, sizeof(wchar_t));
+
+    SafeWCharArrCopy(lpDestWStr->lpWCharArr,
+                     lpSrcWStr->ulSize + LEN_NUL_CHAR,
+                     lpSrcWStr->lpWCharArr,
+                     lpSrcWStr->ulSize);
+
+    SafeWCharArrCopy(lpDestWStr->lpWCharArr + lpSrcWStr->ulSize,
+                     lpSrcWStr2->ulSize + LEN_NUL_CHAR,
+                     lpSrcWStr2->lpWCharArr,
+                     lpSrcWStr2->ulSize);
+}
+
+void
+WStrConcatMany(_Inout_ struct WStr       *lpDestWStr,
+               _In_    const struct WStr *lpSrcWStr,
+               _In_    const struct WStr *lpSrcWStr2, ...)
+{
+    WStrAssertValid(lpSrcWStr);
+    WStrAssertValid(lpSrcWStr2);
+
+    WStrFree(lpDestWStr);
+
+    lpDestWStr->ulSize = lpSrcWStr->ulSize + lpSrcWStr2->ulSize;
+
+    va_list ap;
+    va_start(ap, lpSrcWStr2);
+    while (TRUE)
+    {
+        struct WStr *lpWStr = va_arg(ap, struct WStr *);
+        if (NULL == lpWStr)
+        {
+            break;
+        }
+        lpDestWStr->ulSize += lpWStr->ulSize;
+    }
+    va_end(ap);
+
+    if (0 == lpDestWStr->ulSize) {
+        return;
+    }
+
+    lpDestWStr->lpWCharArr = xcalloc(lpDestWStr->ulSize + LEN_NUL_CHAR, sizeof(wchar_t));
+
+    size_t ulOffset = 0;
+    SafeWCharArrCopy(lpDestWStr->lpWCharArr + ulOffset,
+                     lpSrcWStr->ulSize + LEN_NUL_CHAR,
+                     lpSrcWStr->lpWCharArr,
+                     lpSrcWStr->ulSize);
+
+    ulOffset += lpSrcWStr->ulSize;
+
+    SafeWCharArrCopy(lpDestWStr->lpWCharArr + ulOffset,
+                     lpSrcWStr2->ulSize + LEN_NUL_CHAR,
+                     lpSrcWStr2->lpWCharArr,
+                     lpSrcWStr2->ulSize);
+
+    ulOffset += lpSrcWStr2->ulSize;
+
+    va_list ap2;
+    va_start(ap2, lpSrcWStr2);
+    while (TRUE)
+    {
+        struct WStr *lpWStr = va_arg(ap2, struct WStr *);
+        if (NULL == lpWStr)
+        {
+            break;
+        }
+
+        SafeWCharArrCopy(lpDestWStr->lpWCharArr + ulOffset,
+                         lpWStr->ulSize + LEN_NUL_CHAR,
+                         lpWStr->lpWCharArr,
+                         lpWStr->ulSize);
+
+        ulOffset += lpWStr->ulSize;
+    }
+    va_end(ap2);
+}
+
+void
+WStrTrim(_Inout_ struct WStr                 *lpWStr,
+         _In_    const enum EWStrTrim         eWStrTrim,
+         _In_    const WStrCharPredicateFunc  fpWStrCharPredicateFunc)
 {
     WStrAssertValid(lpWStr);
     assert(eWStrTrim >= WSTR_LTRIM && eWStrTrim <= (WSTR_LTRIM | WSTR_RTRIM));
+    assert(NULL != fpWStrCharPredicateFunc);
 
     if (0 == lpWStr->ulSize) {
         return;
@@ -115,12 +331,12 @@ void WStrTrim(_Inout_ struct WStr                 *lpWStr,
 
     const size_t ulTrimmedSize = lpWStr->ulSize - ulLeadingCount - ulTrailingCount;
 
-    wchar_t *lpWCharArr = xcalloc(ulTrimmedSize + LEN_NULL_CHAR, sizeof(wchar_t));
+    wchar_t *lpWCharArr = xcalloc(ulTrimmedSize + LEN_NUL_CHAR, sizeof(wchar_t));
 
-    wcsncpy_s(lpWCharArr,                           // dest wstr ptr
-              ulTrimmedSize + LEN_NULL_CHAR,        // dest wstr length (including null char)
-              lpWStr->lpWCharArr + ulLeadingCount,  // source wstr ptr
-              ulTrimmedSize);                       // wchar count to be copied (excluding null char)
+    SafeWCharArrCopy(lpWCharArr,
+                     ulTrimmedSize + LEN_NUL_CHAR,
+                     lpWStr->lpWCharArr + ulLeadingCount,
+                     ulTrimmedSize);
 
     WStrFree(lpWStr);
 
@@ -128,36 +344,46 @@ void WStrTrim(_Inout_ struct WStr                 *lpWStr,
     lpWStr->ulSize     = ulTrimmedSize;
 }
 
-void WStrLTrimSpace(_Inout_ struct WStr *lpWStr)
+void
+WStrLTrimSpace(_Inout_ struct WStr *lpWStr)
 {
     WStrTrim(lpWStr, WSTR_LTRIM, iswspace);
 }
 
-void WStrRTrimSpace(_Inout_ struct WStr *lpWStr)
+void
+WStrRTrimSpace(_Inout_ struct WStr *lpWStr)
 {
     WStrTrim(lpWStr, WSTR_RTRIM, iswspace);
 }
 
-void WStrTrimSpace(_Inout_ struct WStr *lpWStr)
+void
+WStrTrimSpace(_Inout_ struct WStr *lpWStr)
 {
     WStrTrim(lpWStr, WSTR_LTRIM | WSTR_RTRIM, iswspace);
 }
 
-static void InternalWStrSplit(_In_    const struct WStr *lpWStrText,
-                              _In_    const struct WStr *lpWStrDelim,
-                              _In_    const int          iMaxTokenCount,  // -1 for unlimited
-                              _In_    const BOOL         bDiscardFinalEmptyToken,
-                              _Inout_ struct WStrArr    *lpTokenWStrArr)
+const int UNLIMITED_MIN_TOKEN_COUNT = -1;
+const int UNLIMITED_MAX_TOKEN_COUNT = -1;
+
+static void
+WStrSplit0(_In_    const struct WStr             *lpWStrText,
+           _In_    const struct WStr             *lpWStrDelim,
+           _In_    const struct WStrSplitOptions *lpOptions,
+           _In_    const BOOL                     bDiscardFinalEmptyToken,
+           _Inout_ struct WStrArr                *lpTokenWStrArr)
 {
     WStrAssertValid(lpWStrText);
     WStrAssertValid(lpWStrDelim);
     // Do not allow empty delim
     assert(0 != lpWStrDelim->ulSize);
-    assert(-1 == iMaxTokenCount || iMaxTokenCount >= 2);
+    assert(NULL != lpOptions);
+    assert(UNLIMITED_MIN_TOKEN_COUNT == lpOptions->iMinTokenCount || lpOptions->iMinTokenCount >= 1);
+    assert(UNLIMITED_MAX_TOKEN_COUNT == lpOptions->iMaxTokenCount || lpOptions->iMaxTokenCount >= 2);
     WStrArrFree(lpTokenWStrArr);
 
     // Important: Text after last delim is final token.
-    const int iMaxDelimCount = (-1 == iMaxTokenCount) ? -1 : (iMaxTokenCount - 1);
+    const int iMaxDelimCount = (UNLIMITED_MAX_TOKEN_COUNT == lpOptions->iMaxTokenCount)
+        ? UNLIMITED_MAX_TOKEN_COUNT : (lpOptions->iMaxTokenCount - 1);
     size_t ulDelimCount = 0;
 
     // Step 1: Count number of delimiters
@@ -181,20 +407,29 @@ static void InternalWStrSplit(_In_    const struct WStr *lpWStrText,
 
         ++ulDelimCount;
 
-        if (-1 != iMaxDelimCount && ((size_t) iMaxDelimCount) == ulDelimCount) {
+        if (UNLIMITED_MAX_TOKEN_COUNT != iMaxDelimCount && ((size_t) iMaxDelimCount) == ulDelimCount) {
             break;
         }
     }
 
     const size_t ulTokenCount = 1U + ulDelimCount;
+
+    if (UNLIMITED_MIN_TOKEN_COUNT != lpOptions->iMinTokenCount && ulTokenCount < ((size_t) lpOptions->iMinTokenCount))
+    {
+        ErrorExitWF(L"ERROR: Failed to split [%ls] with delim [%ls]: ulTokenCount < lpOptions->iMinTokenCount: %lu < %d",
+                    lpWStrText->lpWCharArr, lpWStrDelim->lpWCharArr, ulTokenCount, lpOptions->iMinTokenCount);
+    }
+
     WStrArrAlloc(lpTokenWStrArr, ulTokenCount);
 
     // Step 2: Extract tokens between delimiters
     lpIter = lpWStrText->lpWCharArr;
     for (size_t ulTokenIndex = 0; ulTokenIndex < ulTokenCount; ++ulTokenIndex)
     {
-        // Intention: Include (-1 == iMaxTokenCount) for readability.
-        const BOOL bIsLastToken = (-1 == iMaxTokenCount) ? FALSE : (1U + ulTokenIndex == ((size_t) iMaxTokenCount));
+        // Intention: Include (UNLIMITED_MAX_TOKEN_COUNT == lpOptions->iMaxTokenCount) for readability.
+        const BOOL bIsLastToken =
+            (UNLIMITED_MAX_TOKEN_COUNT == lpOptions->iMaxTokenCount)
+                ? FALSE : (1U + ulTokenIndex == ((size_t) lpOptions->iMaxTokenCount));
 
         const wchar_t *lpNextDelim = wcsstr(lpIter, lpWStrDelim->lpWCharArr);
         if (NULL == lpNextDelim || bIsLastToken)
@@ -212,20 +447,27 @@ static void InternalWStrSplit(_In_    const struct WStr *lpWStrText,
         // Note: In final iteration, 'lpIter' may point to an invalid memory location.
         lpIter = lpNextDelim + lpWStrDelim->ulSize;
     }
+
+    if (NULL != lpOptions->fpNullableWStrConsumerFunc)
+    {
+        WStrArrForEach(lpTokenWStrArr, lpOptions->fpNullableWStrConsumerFunc);
+    }
 }
 
-void WStrSplit(_In_    const struct WStr *lpWStrText,
-               _In_    const struct WStr *lpWStrDelim,
-               _In_    const int          iMaxTokenCount,  // -1 for unlimited
-               _Inout_ struct WStrArr    *lpTokenWStrArr)
+void
+WStrSplit(_In_    const struct WStr             *lpWStrText,
+          _In_    const struct WStr             *lpWStrDelim,
+          _In_    const struct WStrSplitOptions *lpOptions,
+          _Inout_ struct WStrArr                *lpTokenWStrArr)
 {
     const BOOL bDiscardFinalEmptyToken = FALSE;
-    InternalWStrSplit(lpWStrText, lpWStrDelim, iMaxTokenCount, bDiscardFinalEmptyToken, lpTokenWStrArr);
+    WStrSplit0(lpWStrText, lpWStrDelim, lpOptions, bDiscardFinalEmptyToken, lpTokenWStrArr);
 }
 
-void WStrSplitNewLine(_In_    const struct WStr *lpWStrText,
-                      _In_    const int          iMaxLineCount,
-                      _Inout_ struct WStrArr    *lpTokenWStrArr)
+void
+WStrSplitNewLine(_In_    const struct WStr             *lpWStrText,
+                 _In_    const struct WStrSplitOptions *lpOptions,
+                 _Inout_ struct WStrArr                *lpTokenWStrArr)
 {
     WStrAssertValid(lpWStrText);
     WStrArrFree(lpTokenWStrArr);
@@ -235,26 +477,77 @@ void WStrSplitNewLine(_In_    const struct WStr *lpWStrText,
     if (NULL != wcsstr(lpWStrText->lpWCharArr, L"\r\n"))
     {
         struct WStr wstrDelim = {.lpWCharArr = L"\r\n", .ulSize = 2};
-        InternalWStrSplit(lpWStrText, &wstrDelim, iMaxLineCount, bDiscardFinalEmptyToken, lpTokenWStrArr);
+        WStrSplit0(lpWStrText, &wstrDelim, lpOptions, bDiscardFinalEmptyToken, lpTokenWStrArr);
     }
-    else if (NULL != wcsstr(lpWStrText->lpWCharArr, L"\n"))
+    else  // Intentional: Do not check if contains L"\n".  Why?  Always apply rules for lpOptions->iMinTokenCount.
     {
         struct WStr wstrDelim = {.lpWCharArr = L"\n", .ulSize = 1};
-        InternalWStrSplit(lpWStrText, &wstrDelim, iMaxLineCount, bDiscardFinalEmptyToken, lpTokenWStrArr);
+        WStrSplit0(lpWStrText, &wstrDelim, lpOptions, bDiscardFinalEmptyToken, lpTokenWStrArr);
     }
-    else
+}
+
+void
+WStrJoin(_In_    const struct WStrArr *lpWStrArr,
+         _In_    const struct WStr    *lpDelimWStr,
+         _Inout_ struct WStr          *lpDestWStr)
+{
+    assert(NULL != lpWStrArr);
+    assert(NULL != lpDelimWStr);
+    assert(NULL != lpDestWStr);
+
+    WStrArrAssertValid(lpWStrArr);
+    WStrAssertValid(lpDelimWStr);
+    WStrFree(lpDestWStr);
+
+    if (0 == lpWStrArr->ulSize) {
+        return;
+    }
+
+    lpDestWStr->ulSize = lpDelimWStr->ulSize * (lpWStrArr->ulSize - 1UL);
+
+    for (size_t i = 0; i < lpWStrArr->ulSize; ++i)
     {
-        WStrArrAlloc(lpTokenWStrArr, 1);
-        WStrCopyWStr(lpTokenWStrArr->lpWStrArr, lpWStrText);
+        const struct WStr *lpWStr = lpWStrArr->lpWStrArr + i;
+        lpDestWStr->ulSize += lpWStr->ulSize;
+    }
+
+    // We are trying to join all empty strings with empty delim!
+    if (0 == lpDestWStr->ulSize) {
+        return;
+    }
+
+    lpDestWStr->lpWCharArr = xcalloc(lpDestWStr->ulSize + LEN_NUL_CHAR, sizeof(wchar_t));
+
+    wchar_t *lpWCharArr = lpDestWStr->lpWCharArr;
+    for (size_t i = 0; i < lpWStrArr->ulSize; ++i)
+    {
+        const struct WStr *lpWStr = lpWStrArr->lpWStrArr + i;
+        if (i > 0)
+        {
+            SafeWCharArrCopy(lpWCharArr,                          // dest wstr ptr
+                             lpDelimWStr->ulSize + LEN_NUL_CHAR,  // dest wstr length (including null char)
+                             lpDelimWStr->lpWCharArr,             // source wstr ptr
+                             lpDelimWStr->ulSize);                // wchar count to be copied (excluding null char)
+
+            lpWCharArr += lpDelimWStr->ulSize;
+        }
+
+        SafeWCharArrCopy(lpWCharArr,                     // dest wstr ptr
+                         lpWStr->ulSize + LEN_NUL_CHAR,  // dest wstr length (including null char)
+                         lpWStr->lpWCharArr,             // source wstr ptr
+                         lpWStr->ulSize);                // wchar count to be copied (excluding null char)
+
+        lpWCharArr += lpWStr->ulSize;
     }
 }
 
 // Maybe: WStrFileAppend
 // Ref: https://docs.microsoft.com/en-us/windows/win32/fileio/appending-one-file-to-another-file
 
-void WStrFileWrite(_In_ const wchar_t     *lpFilePath,
-                   _In_ const UINT         codePage,  // Ex: CP_UTF8
-                   _In_ const struct WStr *lpWStr)
+void
+WStrFileWrite(_In_ const wchar_t     *lpFilePath,
+              _In_ const UINT         codePage,  // Ex: CP_UTF8
+              _In_ const struct WStr *lpWStr)
 {
     assert(NULL != lpFilePath);
     assert(NULL != lpWStr);
@@ -269,7 +562,7 @@ void WStrFileWrite(_In_ const wchar_t     *lpFilePath,
                                          NULL);                  // [in, optional] hTemplateFile
     if (INVALID_HANDLE_VALUE == hWriteFile)
     {
-        ErrorExitF("CreateFile(lpFilePath[%ls], GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)", lpFilePath);
+        ErrorExitWF(L"CreateFile(lpFilePath[%ls], GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)", lpFilePath);
     }
 
     if (lpWStr->ulSize > 0)
@@ -287,7 +580,8 @@ void WStrFileWrite(_In_ const wchar_t     *lpFilePath,
         assert(iCharArrLen >= 0);
         if (0 == iCharArrLen)
         {
-            ErrorExitF("WideCharToMultiByte(codePage[%ud], WC_ERR_INVALID_CHARS, lpWStr->lpWCharArr[%ld], -1, NULL, 0, NULL, NULL))", codePage, lpWStr->lpWCharArr);
+            ErrorExitWF(L"WideCharToMultiByte(codePage[%ud], WC_ERR_INVALID_CHARS, lpWStr->lpWCharArr[%ld], -1, NULL, 0, NULL, NULL))",
+                        codePage, lpWStr->lpWCharArr);
         }
 
         // Important: WriteFile() only writes chars not wchars.
@@ -304,23 +598,23 @@ void WStrFileWrite(_In_ const wchar_t     *lpFilePath,
                                                      ulCharArrLen,          // [in] int cbMultiByte
                                                      NULL,                  // [in/opt] LPCCH lpDefaultChar
                                                      NULL);                 // [out/opt] LPBOOL lpUsedDefaultChar
-
         assert(iCharArrLen2 >= 0);
         if (0 == iCharArrLen2)
         {
-            ErrorExitF("WideCharToMultiByte(codePage[%ud], WC_ERR_INVALID_CHARS, lpWStr->lpWCharArr[%ld], -1, lpCharArr, ulCharArrLen, NULL, NULL))", codePage, lpWStr->lpWCharArr);
+            ErrorExitWF(L"WideCharToMultiByte(codePage[%ud], WC_ERR_INVALID_CHARS, lpWStr->lpWCharArr[%ld], -1, lpCharArr, ulCharArrLen, NULL, NULL))",
+                        codePage, lpWStr->lpWCharArr);
         }
         assert(iCharArrLen == iCharArrLen2);
 
         // Ref: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-writefile
         DWORD numberOfBytesWritten = 0;
-        if (!WriteFile(hWriteFile,                    // [in] HANDLE hFile
-                       lpCharArr,                     // [in] LPCVOID lpBuffer
-                       ulCharArrLen - LEN_NULL_CHAR,  // [in] DWORD nNumberOfBytesToWrite
-                       &numberOfBytesWritten,         // [out/opt] LPDWORD lpNumberOfBytesWritten
-                       NULL))                         // [in/out/opt] LPOVERLAPPED lpOverlapped
+        if (!WriteFile(hWriteFile,                   // [in] HANDLE hFile
+                       lpCharArr,                    // [in] LPCVOID lpBuffer
+                       ulCharArrLen - LEN_NUL_CHAR,  // [in] DWORD nNumberOfBytesToWrite
+                       &numberOfBytesWritten,        // [out/opt] LPDWORD lpNumberOfBytesWritten
+                       NULL))                        // [in/out/opt] LPOVERLAPPED lpOverlapped
         {
-            ErrorExit("WriteFile");
+            ErrorExitW(L"WriteFile");
         }
 
         xfree((void **) &lpCharArr);
@@ -328,19 +622,20 @@ void WStrFileWrite(_In_ const wchar_t     *lpFilePath,
 
     if (!CloseHandle(hWriteFile))
     {
-        ErrorExit("CloseHandle(hWriteFile)");
+        ErrorExitW(L"CloseHandle(hWriteFile)");
     }
 }
 
-void WStrFileRead(_In_    const wchar_t *lpFilePath,
-                  _In_    const UINT     codePage,  // Ex: CP_UTF8
-                  _Inout_ struct WStr   *lpDestWStr)
+void
+WStrFileRead(_In_    const wchar_t *lpFilePathWCharArr,
+             _In_    const UINT     codePage,  // Ex: CP_UTF8
+             _Inout_ struct WStr   *lpDestWStr)
 {
-    assert(NULL != lpFilePath);
+    assert(NULL != lpFilePathWCharArr);
     WStrFree(lpDestWStr);
 
     // Ref: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
-    const HANDLE hReadFile = CreateFile(lpFilePath,             // [in] LPCWSTR lpFileName
+    const HANDLE hReadFile = CreateFile(lpFilePathWCharArr,             // [in] LPCWSTR lpFileName
                                         GENERIC_READ,           // [in] DWORD dwDesiredAccess
                                         FILE_SHARE_READ,        // [in] DWORD dwShareMode
                                         NULL,                   // [in, optional] LPSECURITY_ATTRIBUTES lpSecurityAttributes
@@ -349,7 +644,7 @@ void WStrFileRead(_In_    const wchar_t *lpFilePath,
                                         NULL);                  // [in, optional] hTemplateFile
     if (INVALID_HANDLE_VALUE == hReadFile)
     {
-        ErrorExitF("CreateFile(lpFilePath[%ls], GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)", lpFilePath);
+        ErrorExitWF(L"CreateFile(lpFileName[%ls], GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)", lpFilePathWCharArr);
     }
 
     // Ref: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfilesize
@@ -357,35 +652,36 @@ void WStrFileRead(_In_    const wchar_t *lpFilePath,
     const DWORD dwFileSize = GetFileSize(hReadFile, lpdwHighFileSize);
     if (INVALID_FILE_SIZE == dwFileSize)
     {
-        ErrorExitF("GetFileSize(lpFilePath:%ls)", lpFilePath);
+        ErrorExitWF(L"GetFileSize(lpFileName[%ls])", lpFilePathWCharArr);
     }
 
     if (0 == dwFileSize)
     {
         if (!CloseHandle(hReadFile))
         {
-            ErrorExitF("CloseHandle(hReadFile, lpFilePath:%ls)", lpFilePath);
+            ErrorExitWF(L"CloseHandle(hReadFile, lpFileName[%ls])", lpFilePathWCharArr);
         }
+        // Above, WStrFree(lpDestWStr) is called.  Thus, lpDestWStr has zero length.
         return;
     }
 
     // Important: ReadFile() only reads chars not wchars.
-    const size_t ulCharArrLen = sizeof(char) * (dwFileSize + LEN_NULL_CHAR);
+    const size_t ulCharArrLen = sizeof(char) * (dwFileSize + LEN_NUL_CHAR);
 
-    char *lpCharArr = xcalloc(dwFileSize + LEN_NULL_CHAR, sizeof(char));
+    char *lpCharArr = xcalloc(dwFileSize + LEN_NUL_CHAR, sizeof(char));
 
     // Ref: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-readfile
     DWORD dwNumberOfBytesRead = 0;
     if (!ReadFile(hReadFile, lpCharArr, ulCharArrLen, &dwNumberOfBytesRead, NULL))
     {
-        ErrorExitF("ReadFile(lpFilePath:%ls)", lpFilePath);
+        ErrorExitWF(L"ReadFile(lpFileName:%ls)", lpFilePathWCharArr);
     }
     assert(dwFileSize == dwNumberOfBytesRead);
     lpCharArr[dwNumberOfBytesRead] = '\0';
 
     if (!CloseHandle(hReadFile))
     {
-        ErrorExitF("CloseHandle(hReadFile, lpFilePath:%ls)", lpFilePath);
+        ErrorExitWF(L"CloseHandle(hReadFile, lpFileName:%ls)", lpFilePathWCharArr);
     }
 
     // Note: "BOM" == byte order mark
@@ -397,19 +693,19 @@ void WStrFileRead(_In_    const wchar_t *lpFilePath,
     }
     else if (dwFileSize >= 4 && ((char) 0xFF) == lpCharArr[0] && ((char) 0xFE) == lpCharArr[1] && ((char) 0x00) == lpCharArr[2] && ((char) 0x00) == lpCharArr[3])
     {
-        ErrorExit("UTF-32LE (little endian) BOM (byte order mark) is not supported!");
+        ErrorExitW(L"UTF-32LE (little endian) BOM (byte order mark) is not supported!");
     }
     else if (dwFileSize >= 4 && ((char) 0x00) == lpCharArr[0] && ((char) 0x00) == lpCharArr[1] && ((char) 0xFF) == lpCharArr[2] && ((char) 0xFE) == lpCharArr[3])
     {
-        ErrorExit("UTF-32BE (big endian) BOM (byte order mark) is not supported!");
+        ErrorExitW(L"UTF-32BE (big endian) BOM (byte order mark) is not supported!");
     }
     else if (dwFileSize >= 2 && ((char) 0xFF) == lpCharArr[0] && ((char) 0xFE) == lpCharArr[1])
     {
-        ErrorExit("UTF-16LE (little endian) BOM (byte order mark) is not supported!");
+        ErrorExitW(L"UTF-16LE (little endian) BOM (byte order mark) is not supported!");
     }
     else if (dwFileSize >= 2 && ((char) 0xFE) == lpCharArr[0] && ((char) 0xFF) == lpCharArr[1])
     {
-        ErrorExit("UTF-16BE (big endian) BOM (byte order mark) is not supported!");
+        ErrorExitW(L"UTF-16BE (big endian) BOM (byte order mark) is not supported!");
     }
 
     // Ref: https://docs.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-multibytetowidechar
@@ -424,7 +720,7 @@ void WStrFileRead(_In_    const wchar_t *lpFilePath,
     assert(iWCharArrLen >= 0);
     if (0 == iWCharArrLen)
     {
-        ErrorExitF("MultiByteToWideChar(codePage[%ud], MB_ERR_INVALID_CHARS, lpCharArrAfterBOM, -1, NULL, 0)", codePage);
+        ErrorExitWF(L"MultiByteToWideChar(codePage[%ud], MB_ERR_INVALID_CHARS, lpCharArrAfterBOM, -1, NULL, 0)", codePage);
     }
 
     wchar_t* lpWCharArr = xcalloc(iWCharArrLen, sizeof(wchar_t));
@@ -439,17 +735,18 @@ void WStrFileRead(_In_    const wchar_t *lpFilePath,
     assert(iWCharArrLen2 >= 0);
     if (0 == iWCharArrLen2)
     {
-        ErrorExitF("MultiByteToWideChar(codePage[%ud], MB_ERR_INVALID_CHARS, lpCharArrAfterBOM, lpWCharArr, iWCharArrLen)", codePage);
+        ErrorExitWF(L"MultiByteToWideChar(codePage[%ud], MB_ERR_INVALID_CHARS, lpCharArrAfterBOM, lpWCharArr, iWCharArrLen)", codePage);
     }
     assert(iWCharArrLen == iWCharArrLen2);
 
     xfree((void **) &lpCharArr);
 
     lpDestWStr->lpWCharArr = lpWCharArr;
-    lpDestWStr->ulSize     = iWCharArrLen - LEN_NULL_CHAR;
+    lpDestWStr->ulSize     = iWCharArrLen - LEN_NUL_CHAR;
 }
 
-void WStrArrAssertValid(_In_ const struct WStrArr *lpWStrArr)
+void
+WStrArrAssertValid(_In_ const struct WStrArr *lpWStrArr)
 {
     assert(NULL != lpWStrArr);
     if (lpWStrArr->ulSize > 0)
@@ -458,7 +755,8 @@ void WStrArrAssertValid(_In_ const struct WStrArr *lpWStrArr)
     }
 }
 
-void WStrArrFree(_Inout_ struct WStrArr *lpWStrArr)
+void
+WStrArrFree(_Inout_ struct WStrArr *lpWStrArr)
 {
     WStrArrAssertValid(lpWStrArr);
 
@@ -473,20 +771,51 @@ void WStrArrFree(_Inout_ struct WStrArr *lpWStrArr)
     lpWStrArr->ulSize = 0;  // Explicit
 }
 
-void WStrArrAlloc(_Inout_ struct WStrArr *lpWStrArr,
-                  _In_    const size_t    ulSize)
+void
+WStrArrAlloc(_Inout_ struct WStrArr *lpWStrArr,
+             _In_    const size_t    ulSize)
 {
     WStrArrFree(lpWStrArr);
-    assert(ulSize > 0);  // alloc an empty array seems silly!
-
-    lpWStrArr->lpWStrArr = xcalloc(ulSize, sizeof(struct WStr));
-    lpWStrArr->ulSize = ulSize;
+    if (ulSize > 0)
+    {
+        lpWStrArr->lpWStrArr = xcalloc(ulSize, sizeof(struct WStr));
+        lpWStrArr->ulSize = ulSize;
+    }
 }
 
-void WStrArrForEach(_Inout_ struct WStrArr         *lpWStrArr,
-                    _In_    const WStrConsumerFunc  fpWStrConsumerFunc)
+void
+WStrArrCopyWCharArrArr(_Inout_ struct WStrArr  *lpDestWStrArr,
+                       _In_    const wchar_t  **lppNullableSrcWCharArrArr,
+                       _In_    const size_t     ulSrcCount)
+{
+    assert(NULL != lpDestWStrArr);
+
+    WStrArrFree(lpDestWStrArr);
+    WStrArrAlloc(lpDestWStrArr, ulSrcCount);
+
+    if (0 == ulSrcCount)
+    {
+        assert(NULL == lppNullableSrcWCharArrArr);
+        return;
+    }
+    else
+    {
+        assert(NULL != lppNullableSrcWCharArrArr);
+    }
+
+    for (size_t i = 0; i < ulSrcCount; ++i)
+    {
+        struct WStr *lpWStr = lpDestWStrArr->lpWStrArr + i;
+        WStrCopyWCharArr(lpWStr, lppNullableSrcWCharArrArr[i], wcslen(lppNullableSrcWCharArrArr[i]));
+    }
+}
+
+void
+WStrArrForEach(_Inout_ struct WStrArr         *lpWStrArr,
+               _In_    const WStrConsumerFunc  fpWStrConsumerFunc)
 {
     WStrArrAssertValid(lpWStrArr);
+    assert(NULL != fpWStrConsumerFunc);
 
     for (size_t i = 0; i < lpWStrArr->ulSize; ++i)
     {

@@ -1,0 +1,44 @@
+
+# This is a comment.  Whitespace and empty lines are ignored.
+
+# This is a sample config for win32/pass_help.
+# GitHub: https://github.com/kevinarpe/win32/tree/master/pass_help
+
+# File format
+# Line #1 : <shortcut-key> to display dialog
+# Line #2+: <username>|<password>
+
+# <shortcut-key> format: [L/RCtrl+][L/RShift+][L/RAlt+]<virtual-key-code>
+#
+# ... where [LCtrl+] and [RCtrl+] are optional left/right Control key indicators,
+#     e.g., LCtrl+0x50 for LCtrl+P or RCtrl+0x50 for RCtrl+P
+#
+# ... where [LShift+] and [RShift+] are optional left/right Shift key indicators,
+#     e.g., LShift+0x50 for LShift+P or RShift+0x50 for RShift+P
+#
+# ... where [LAlt+] and [RAlt+] are optional left/right Alt key indicators,
+#     e.g., LAlt+0x50 for LAlt+P or RAlt+0x50 for RAlt+P
+#
+# ... where L/RCtrl, L/RShift, L/RAlt modifiers may be combined and order is not important,
+#     e.g., LCtrl+LShift+LAlt+P or LShift+LCtrl+LAlt+P or LShift+LAlt+LCtrl+P
+#
+# ... where <virtual-key-code> is hexidecimal code (with 0x prefix) for Win32 virtual-key code,
+#     e.g., 0x50 for P
+#     Read more here: https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
+
+# P: 0x50
+LCtrl+LShift+LAlt+0x50
+
+username|password
+username2|password2
+username3|password3
+username4|password4
+username5|password5
+username6|password6
+username7|password7
+username8|password8
+username9|password9
+username10|password10
+username11|password11
+username12|password12
+

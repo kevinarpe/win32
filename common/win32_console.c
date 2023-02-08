@@ -1,4 +1,4 @@
-#include "console.h"
+#include "win32_console.h"
 #include "win32.h"
 #include "min_max.h"
 #include "error_exit.h"
@@ -8,7 +8,8 @@
 #include <fcntl.h>  // required for _O_TEXT
 #include <stdio.h>  // required for _snwprintf_s() and _fdopen()
 
-static char *StaticGetStdHandleName(_In_ const DWORD nStdHandle)
+static char *
+StaticGetStdHandleName(_In_ const DWORD nStdHandle)
 {
     switch (nStdHandle)
     {
@@ -23,22 +24,24 @@ static char *StaticGetStdHandleName(_In_ const DWORD nStdHandle)
     }
 }
 
-static HANDLE StaticGetStdHandle(_In_ const DWORD nStdHandle)
+static HANDLE
+StaticGetStdHandle(_In_ const DWORD nStdHandle)
 {
     // Ref: https://docs.microsoft.com/en-us/windows/console/getstdhandle
     const HANDLE h = GetStdHandle(nStdHandle);
     if (INVALID_HANDLE_VALUE == h)
     {
-        ErrorExitF("INVALID_HANDLE_VALUE == GetStdHandle(%s)", StaticGetStdHandleName(nStdHandle));
+        ErrorExitWF(L"INVALID_HANDLE_VALUE == GetStdHandle(%s)", StaticGetStdHandleName(nStdHandle));
     }
     else if (NULL == h)
     {
-        ErrorExitF("NULL == GetStdHandle(%s)", StaticGetStdHandleName(nStdHandle));
+        ErrorExitWF(L"NULL == GetStdHandle(%s)", StaticGetStdHandleName(nStdHandle));
     }
     return h;
 }
 
-static void StaticRedirect(_In_ const DWORD nStdHandle)
+static void
+StaticRedirect(_In_ const DWORD nStdHandle)
 {
     char *mode = NULL;
     FILE *fpStd = NULL;
@@ -75,14 +78,14 @@ static void StaticRedirect(_In_ const DWORD nStdHandle)
     const int fd = _open_osfhandle((intptr_t) hStd, _O_TEXT);
     if (-1 == fd)
     {
-        ErrorExitF("-1 == _open_osfhandle(%s, _O_TEXT)", StaticGetStdHandleName(nStdHandle));
+        ErrorExitWF(L"-1 == _open_osfhandle(%s, _O_TEXT)", StaticGetStdHandleName(nStdHandle));
     }
 
     // Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/fdopen-wfdopen?view=msvc-170
     const FILE *fpStdNew = _fdopen(fd, mode);
     if (NULL == fpStdNew)
     {
-        ErrorExitF("NULL == _fdopen(%s, \"w\")", StaticGetStdHandleName(nStdHandle));
+        ErrorExitWF(L"NULL == _fdopen(%s, \"w\")", StaticGetStdHandleName(nStdHandle));
     }
 
     *fpStd = *fpStdNew;
@@ -93,14 +96,15 @@ static void StaticRedirect(_In_ const DWORD nStdHandle)
                      _IONBF,  // int mode
                      0))      // size_t size
     {
-        ErrorExitF("0 != setvbuf(%s, ...)", StaticGetStdHandleName(nStdHandle));
+        ErrorExitWF(L"0 != setvbuf(%s, ...)", StaticGetStdHandleName(nStdHandle));
     }
 }
 
 // Ref: http://dslweb.nwnexus.com/~ast/dload/guicon.htm
 // Ref: https://www.asawicki.info/news_1326_redirecting_standard_io_to_windows_console
 // Ref: https://gist.github.com/rhoot/2893136
-void RedirectIOToConsole(const size_t ulMinConsoleLines,
+void
+Win32RedirectIOToConsole(const size_t ulMinConsoleLines,
                          const size_t ulMaxConsoleLines)
 {
     // Intentional: ...
@@ -116,9 +120,10 @@ void RedirectIOToConsole(const size_t ulMinConsoleLines,
     {
         // Intentional: Linux/Wine has some weird behaviour!
         #if defined(__WINE__)
-            LogF(stderr, "ERROR: AllocConsole() return non-TRUE result: %d (TRUE=%d, FALSE=%d)", bAllocConsoleRef, TRUE, FALSE);
+            DEBUG_LOGWF(stderr, L"ERROR: AllocConsole() return non-TRUE result: %d (TRUE=%d, FALSE=%d)\r\n",
+                        bAllocConsoleRef, TRUE, FALSE);
         #else
-            ErrorExit("AllocConsole()");
+            ErrorExitW(L"AllocConsole()");
         #endif  // __WINE__
     }
 
@@ -128,7 +133,7 @@ void RedirectIOToConsole(const size_t ulMinConsoleLines,
     CONSOLE_SCREEN_BUFFER_INFO coninfo = {};
     if (!GetConsoleScreenBufferInfo(hStdout, &coninfo))
     {
-        ErrorExit("GetConsoleScreenBufferInfo(hStdout, &CONSOLE_SCREEN_BUFFER_INFO)");
+        ErrorExitW(L"GetConsoleScreenBufferInfo(hStdout, &CONSOLE_SCREEN_BUFFER_INFO)");
     }
 
     const SHORT sConsoleLines = MinShort(sMaxConsoleLines,
@@ -140,7 +145,7 @@ void RedirectIOToConsole(const size_t ulMinConsoleLines,
         const COORD dwSize = {.X = coninfo.dwSize.X, .Y = sConsoleLines};
         if (!SetConsoleScreenBufferSize(hStdout, dwSize))
         {
-            ErrorExit("SetConsoleScreenBufferSize(hStdout, &coninfo)");
+            ErrorExitW(L"SetConsoleScreenBufferSize(hStdout, &coninfo)");
         }
     }
 
