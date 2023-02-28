@@ -183,8 +183,19 @@ LowLevelKeyboardProc(_In_ const int    nCode,
                  && info->vkCode                 == global.win.config.shortcutKey.dwVkCode)
         {
             DEBUG_LOGW(stdout, L"INFO: Shortcut key pressed\r\n");
+            // Is window minimised?  Show.
+            // Ref: https://learn.microsoft.com/en-us/windows/win31/api/winuser/nf-winuser-isiconic
+            if (IsIconic(global.win.hWnd))  // [in] HWND hWnd
+            {
+                DEBUG_LOGW(stdout, L"INFO: IsIconic: ShowWindow(hWnd, SW_NORMAL)\r\n");
+                ShowWindow(global.win.hWnd,  // [in] HWND hWnd
+                           // "Activates and displays a window. If the window is minimized or maximized, the system restores it to its original size and position.
+                           //  An application should specify this flag when displaying the window for the first time."
+                           SW_NORMAL);       // [in] int  nCmdShow
+            }
+            // Is window hidden?  Show.
             // Ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-iswindowvisible
-            if (!IsWindowVisible(global.win.hWnd))  // [in] HWND hWnd
+            else if (!IsWindowVisible(global.win.hWnd))  // [in] HWND hWnd
             {
                 DEBUG_LOGW(stdout, L"INFO: !IsWindowVisible: ShowWindow(hWnd, SW_NORMAL)\r\n");
                 // Ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow
@@ -193,20 +204,21 @@ LowLevelKeyboardProc(_In_ const int    nCode,
                 ShowWindow(global.win.hWnd,  // [in] HWND hWnd
                            // "Activates the window and displays it in its current size and position."
 //                           SW_SHOW);         // [in] int  nCmdShow
-                           SW_NORMAL);         // [in] int  nCmdShow
-            }
-            // Ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-isiconic
-            else if (IsIconic(global.win.hWnd))  // [in] HWND hWnd
-            {
-                DEBUG_LOGW(stdout, L"INFO: IsIconic: ShowWindow(hWnd, SW_NORMAL)\r\n");
-                ShowWindow(global.win.hWnd,  // [in] HWND hWnd
                            // "Activates and displays a window. If the window is minimized or maximized, the system restores it to its original size and position.
                            //  An application should specify this flag when displaying the window for the first time."
-                           SW_NORMAL);       // [in] int  nCmdShow
+                           SW_NORMAL);         // [in] int  nCmdShow
             }
-            else
-            {
-                DEBUG_LOGW(stdout, L"INFO: No -> ShowWindow\r\n");
+            // Is window visible?  Activate.
+            else {
+                // Ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getactivewindow
+                // @Nullable
+                const HWND hNullableWndActive = GetActiveWindow();
+                // Ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setactivewindow
+                const HWND hNullablePrevWndActive = SetActiveWindow(global.win.hWnd);  // [in] HWND hWnd
+                if (hNullableWndActive != hNullablePrevWndActive)
+                {
+                    ErrorExitW(L"SetActiveWindow(global.win.hWnd)");
+                }
             }
         }
     }
@@ -220,7 +232,7 @@ _printfLParamWM_SIZE(_In_ const LPARAM lParam)
     const WORD wWidth  = LOWORD(lParam);
     __attribute__((unused))
     const WORD wHeight = HIWORD(lParam);
-    DEBUG_LOGWF(L"width:LOWORD(lParam):%d, height:HIWORD(lParam):%d", wWidth, wHeight);
+    DEBUG_LOGWF(stdout, L"width:LOWORD(lParam):%d, height:HIWORD(lParam):%d", wWidth, wHeight);
 }
 /*
 static void
@@ -487,13 +499,23 @@ GetTextSize(_In_  HDC                hDC,
     WStrAssertValid(lpWStr);
     assert(NULL != lpSize);
 
+    // About DrawText() vs GetTextExtentPoint32W():
+    // Ref: https://stackoverflow.com/questions/1126730/how-to-find-the-width-of-a-string-in-pixels-in-win32
+
     // Ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-drawtextw
     RECT rect = {0};
-    if (!DrawText(hDC,                                         // [in]      HDC     hdc,
-                  lpWStr->lpWCharArr,                          // [in, out] LPCWSTR lpchText,
-                  lpWStr->ulSize,                              // [in]      int     cchText,
-                  &rect,                                       // [in, out] LPRECT  lprc,
-                  DT_CALCRECT | DT_NOPREFIX | DT_SINGLELINE))  // [in]      UINT    format
+    if (!DrawTextW(hDC,                                         // [in]      HDC     hdc,
+                   lpWStr->lpWCharArr,                          // [in, out] LPCWSTR lpchText,
+                   lpWStr->ulSize,                              // [in]      int     cchText,
+                   &rect,                                       // [in, out] LPRECT  lprc,
+                   (UINT) (                                     // [in]      UINT    format
+                       DT_CALCRECT  // "Determines the width and height of the rectangle.
+                                    //  If there is only one line of text, DrawText modifies the right side of the rectangle so that it bounds the last character in the line.
+                                    //  DrawText returns the height of the formatted text but does not draw the text."
+                       | DT_NOPREFIX  // "Turns off processing of prefix characters.
+                                      //  Normally, DrawText interprets the mnemonic-prefix character & as a directive to underscore the character that follows,
+                                      //  and the mnemonic-prefix characters && as a directive to print a single &. By specifying DT_NOPREFIX, this processing is turned off."
+                       | DT_SINGLELINE)))  // "Displays text on a single line only. Carriage returns and line feeds do not break the line."
     {
         ErrorExitWF(L"DrawText(hDC, lpWStr->lpWCharArr[%ls], lpWStr->ulSize[%zd], &rect, DT_CALCRECT | DT_NOPREFIX | DT_SINGLELINE)",
                     lpWStr->lpWCharArr, lpWStr->ulSize);
@@ -502,14 +524,14 @@ GetTextSize(_In_  HDC                hDC,
     lpSize->cx = rectWidth(&rect);
     lpSize->cy = rectHeight(&rect);
 
-    // Ref: https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-gettextextentpointw
+    // Ref: https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-gettextextentpoint32w
     SIZE size = {0};
-    if (!GetTextExtentPointW(hDC,                 // [in]  HDC     hdc,
-                             lpWStr->lpWCharArr,  // [in]  LPCWSTR lpString,
-                             lpWStr->ulSize,      // [in]  int     c,
-                             &size))              // [out] LPSIZE  lpsz
+    if (!GetTextExtentPoint32W(hDC,                 // [in]  HDC     hdc,
+                               lpWStr->lpWCharArr,  // [in]  LPCWSTR lpString,
+                               lpWStr->ulSize,      // [in]  int     c,
+                               &size))              // [out] LPSIZE  lpsz
     {
-        ErrorExitWF(L"GetTextExtentPointW(hDC, lpWStr->lpWCharArr[%ls], lpWStr->ulSize[%zd], &size)",
+        ErrorExitWF(L"GetTextExtentPoint32W(hDC, lpWStr->lpWCharArr[%ls], lpWStr->ulSize[%zd], &size)",
                     lpWStr->lpWCharArr, lpWStr->ulSize);
     }
 
@@ -547,13 +569,6 @@ WindowLayoutInit(_In_ const HWND     hWnd,
                          USER_DEFAULT_SCREEN_DPI)             // [in] int nDenominator
         };
 
-    // Ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getdc
-    HDC hDC = GetDC(hWnd);  // [in] HWND hWnd
-    if (NULL == hDC)
-    {
-        ErrorExitW(L"GetDC(hWnd)");
-    }
-
     // This is an (in)famous font size formula from Microsoft.
     // Ref: https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-muldiv
     // Ref: https://jeffpar.github.io/kbarchive/kb/074/Q74299/
@@ -585,7 +600,14 @@ WindowLayoutInit(_In_ const HWND     hWnd,
     lpLayout->hFont = CreateFontIndirectW(&lpLayout->logFont);
     if (NULL == lpLayout->hFont)
     {
-        ErrorExitWF(L"CreateFontIndirectW(%ld, \"%ls\")", lpLayout->logFont.lfHeight, lpLayout->logFont.lfFaceName);
+        ErrorExitWF(L"CreateFontIndirectW(lfHeight:%ld, lfFaceName[%ls])", lpLayout->logFont.lfHeight, lpLayout->logFont.lfFaceName);
+    }
+
+    // Ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getdc
+    HDC hDC = GetDC(hWnd);  // [in] HWND hWnd
+    if (NULL == hDC)
+    {
+        ErrorExitW(L"GetDC(hWnd)");
     }
 
     // Ref: https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-selectobject
@@ -594,6 +616,7 @@ WindowLayoutInit(_In_ const HWND     hWnd,
         ErrorExitW(L"SelectObject(hDC, (HGDIOBJ) (lpLayout->hFont))");
     }
 
+    // Ref: https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-gettextmetricsw
     if (!GetTextMetricsW(hDC, &lpLayout->fontMetrics))
     {
         ErrorExitW(L"GetTextMetricsW(dc, &lpLayout->fontMetrics)");
@@ -844,7 +867,9 @@ WindowProc_WM_CREATE(_In_ const HWND   hWnd,
     // Before this function returns, the following window messages are received by wndproc: WM_PARENTNOTIFY
     lpWin->hListBox =
         CreateWindowExW(
-            0,  // [in]           DWORD     dwExStyle,
+            // Ref: https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles
+            (DWORD) (                   // [in]           DWORD     dwExStyle,
+                WS_EX_CLIENTEDGE),      // "The window has a border with a sunken edge."
             // Ref: https://learn.microsoft.com/en-us/windows/win32/controls/common-control-window-classes
             // Ref: https://learn.microsoft.com/en-us/windows/win32/controls/list-boxes
             WC_LISTBOXW,  // [in, optional] LPCWSTR   lpClassName,
@@ -1859,7 +1884,7 @@ wWinMain(HINSTANCE hInstance,      // The operating system uses this value to id
             .fontPointSize = 12,
             .fontFaceNameWStr = WSTR_FROM_LITERAL(L"Consolas"),
             .spacing = 5,
-            .listBoxMinSize = {.cx = 128, .cy = 128},
+            .listBoxMinSize = {.cx = 128, .cy = 256},
             .labelDescWStr = WSTR_FROM_LITERAL(L"Select password to copy to clipboard:"),
             .labelTipWStr = WSTR_FROM_LITERAL(L"Ctrl+C to copy username to clipboard"),
         },
