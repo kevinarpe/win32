@@ -59,7 +59,8 @@ LogW(_In_ FILE          *fp,
 void
 LogWF(_In_ FILE          *fp,
       // @EmptyStringAllowed
-      _In_ const wchar_t *lpszMsgFmt, ...);
+      _In_ const wchar_t *lpszMsgFmt,
+      _In_ ...);
 
 /**
  * fprintf() timestamp, then vfwprintf() message.  Newline must be explicitly included.

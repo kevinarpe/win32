@@ -1,5 +1,5 @@
 #include "config.h"
-#include "error_exit.h"
+#include "win32_last_error.h"
 #include "xmalloc.h"
 #include "log.h"
 #include <assert.h>   // required for assert()
@@ -53,12 +53,14 @@ ConfigAssertValid(_In_ const struct Config *lpConfig)
 {
     if (0 == lpConfig->shortcutKey.eKeyModifiers && 0 == lpConfig->shortcutKey.dwVkCode)
     {
-        ErrorExitW(L"Config file: Missing shortcut key");
+        Win32LastErrorFPutWSAbort(stderr,                                 // _In_ FILE          *lpStream
+                                  L"Config file: Missing shortcut key");  // _In_ const wchar_t *lpMessage
     }
 
     if (0 == lpConfig->dynArr.ulSize)
     {
-        ErrorExitW(L"Config file: Found zero username and password entries");
+        Win32LastErrorFPutWSAbort(stderr,                                                     // _In_ FILE          *lpStream
+                                  L"Config file: Found zero username and password entries");  // _In_ const wchar_t *lpMessage
     }
 }
 
@@ -82,7 +84,7 @@ ConfigParseFile(_In_  const wchar_t *lpConfigFilePathWCharArr,
     WStrSplitNewLine(&textWStr, &splitOptions, &lineWStrArr);
 
     BOOL bFirstLine = TRUE;
-    struct ShortcutKey shortcutKey = {0};
+    struct Win32ShortcutKey shortcutKey = {0};
     struct ConfigEntryDynArr dynArr = {0};
 
     for (size_t ulLineIndex = 0; ulLineIndex < lineWStrArr.ulSize; ++ulLineIndex)
@@ -101,9 +103,10 @@ ConfigParseFile(_In_  const wchar_t *lpConfigFilePathWCharArr,
         {
             bFirstLine = FALSE;
             struct WStr errorWStr = {0};
-            if (FALSE == ShortcutKeyTryParseWStr(lpLineWStr, &shortcutKey, &errorWStr))
+            if (FALSE == Win32ShortcutKeyTryParseWStr(lpLineWStr, &shortcutKey, &errorWStr))
             {
-                ErrorExitWF(L"%ls", errorWStr.lpWCharArr);
+                Win32LastErrorFPutWSAbort(stderr,                 // _In_ FILE          *lpStream
+                                          errorWStr.lpWCharArr);  // _In_ const wchar_t *lpMessage
             }
         }
         else {
@@ -145,16 +148,18 @@ ConfigParseLine(_In_  const size_t        ulLineIndex,
 
     if (tokenWStrArr.ulSize < 2)
     {
-        ErrorExitWF(L"Config file: Failed to find delim [%ls]\r\n"
-                    L"Line #%zd: %ls\r\n",
-                    delimWStr.lpWCharArr, (1 + ulLineIndex), lpLineWStr->lpWCharArr);
+        Win32LastErrorFPrintFWAbort(stderr,                 // _In_ FILE          *lpStream,
+                                    L"Config file: Failed to find delim [%ls]\r\n"
+                                    L"Line #%zd: %ls\r\n",  // _In_ const wchar_t *lpMessageFormat,
+                                    delimWStr.lpWCharArr, (1 + ulLineIndex), lpLineWStr->lpWCharArr);  // _In_ ...
     }
 
     if (tokenWStrArr.ulSize > 2)
     {
-        ErrorExitWF(L"Config file: Found multiple delim [%ls]\r\n"
-                    L"Line #%zd: %ls\r\n",
-                    delimWStr.lpWCharArr, (1 + ulLineIndex), lpLineWStr->lpWCharArr);
+        Win32LastErrorFPrintFWAbort(stderr,                 // _In_ FILE          *lpStream,
+                                    L"Config file: Found multiple delim [%ls]\r\n"
+                                    L"Line #%zd: %ls\r\n",  // _In_ const wchar_t *lpMessageFormat,
+                                    delimWStr.lpWCharArr, (1 + ulLineIndex), lpLineWStr->lpWCharArr);  // _In_ ...
     }
 
     // Ex: L"username|password" -> L"username"
@@ -165,15 +170,17 @@ ConfigParseLine(_In_  const size_t        ulLineIndex,
 
     if (0 == lpUsernameWStr->ulSize)
     {
-        ErrorExitWF(L"Config file: Username is empty\r\n"
-                    L"Line #%zd: %ls\r\n",
-                    (1 + ulLineIndex), lpLineWStr->lpWCharArr);
+        Win32LastErrorFPrintFWAbort(stderr,                 // _In_ FILE          *lpStream,
+                                    L"Config file: Username is empty\r\n"
+                                    L"Line #%zd: %ls\r\n",  // _In_ const wchar_t *lpMessageFormat,
+                                    (1 + ulLineIndex), lpLineWStr->lpWCharArr);  // _In_ ...
     }
     else if (0 == lpPasswordWStr->ulSize)
     {
-        ErrorExitWF(L"Config file: Password is empty\r\n"
-                    L"Line #%zd: %ls\r\n",
-                    (1 + ulLineIndex), lpLineWStr->lpWCharArr);
+        Win32LastErrorFPrintFWAbort(stderr,                 // _In_ FILE          *lpStream,
+                                    L"Config file: Password is empty\r\n"
+                                    L"Line #%zd: %ls\r\n",  // _In_ const wchar_t *lpMessageFormat,
+                                    (1 + ulLineIndex), lpLineWStr->lpWCharArr);  // _In_ ...
     }
 
     // Intentional: MUST copy.  Do not assign.  Why?  WStrArrFree() is called next.

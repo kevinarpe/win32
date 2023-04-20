@@ -1,6 +1,7 @@
 #include "error_exit.h"
 #include "win32.h"
 #include "log.h"
+#include "win32_memory.h"
 #include <assert.h>
 #include <stdio.h>
 
@@ -8,8 +9,10 @@
 static void
 FwprintfErrorThenAbort(_In_ const DWORD dwLastError)
 {
+    // Ref: https://learn.microsoft.com/en-us/windows/win32/api/winnt/nf-winnt-makelangid
     const DWORD dwLanguageId = MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT);
     wchar_t *lpWCharArr = NULL;
+    // Ref: https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-formatmessagew
     const DWORD dwStrLen = FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER
                                           | FORMAT_MESSAGE_FROM_SYSTEM
                                           | FORMAT_MESSAGE_IGNORE_INSERTS,  // [in] DWORD dwFlags
@@ -60,9 +63,8 @@ ErrorExitW(// @EmptyStringAllowed
     // Ref: https://learn.microsoft.com/en-us/windows/win32/api/errhandlingapi/nf-errhandlingapi-getlasterror
     const DWORD dwLastError = GetLastError();
 
-    // Only print prefix, e.g., "2023-01-31 00:51:45.064 +09:00 "
-    LogW(stderr, L"");
-    fputws(L"ERROR: ", stderr);
+    // Print prefix, e.g., "2023-01-31 00:51:45.064 +09:00 ERROR: "
+    LogW(stderr, L"ERROR: ");
     fputws(lpszMsg, stderr);
     PrintLastErrorThenAbort(dwLastError);
 }
@@ -76,9 +78,8 @@ ErrorExitWF(// @EmptyStringAllowed
     // Ref: https://learn.microsoft.com/en-us/windows/win32/api/errhandlingapi/nf-errhandlingapi-getlasterror
     const DWORD dwLastError = GetLastError();
 
-    // Only print prefix, e.g., "2023-01-31 00:51:45.064 +09:00 "
-    LogW(stderr, L"");
-    fputws(L"ERROR: ", stderr);
+    // Print prefix, e.g., "2023-01-31 00:51:45.064 +09:00 ERROR: "
+    LogW(stderr, L"ERROR: ");
 
     // Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/va-arg-va-copy-va-end-va-start?view=msvc-170
     va_list ap;
@@ -90,6 +91,7 @@ ErrorExitWF(// @EmptyStringAllowed
     PrintLastErrorThenAbort(dwLastError);
 }
 
+
 void
 ErrorExitWFV(// @EmptyStringAllowed
              _In_ const wchar_t *lpszMsgFmt,
@@ -100,9 +102,8 @@ ErrorExitWFV(// @EmptyStringAllowed
     // Ref: https://learn.microsoft.com/en-us/windows/win32/api/errhandlingapi/nf-errhandlingapi-getlasterror
     const DWORD dwLastError = GetLastError();
 
-    // Only print prefix, e.g., "2023-01-31 00:51:45.064 +09:00 "
-    LogW(stderr, L"");
-    fputws(L"ERROR: ", stderr);
+    // Print prefix, e.g., "2023-01-31 00:51:45.064 +09:00 ERROR: "
+    LogW(stderr, L"ERROR: ");
 
     // Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/va-arg-va-copy-va-end-va-start?view=msvc-170
     va_list ap_copy;

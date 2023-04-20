@@ -25,6 +25,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+#include <stdbool.h>
+
 #define LEN_NUL_CHAR 1UL
 
 // Ref: https://learn.microsoft.com/uk-ua/windows-hardware/drivers/ddi/ntstrsafe/nf-ntstrsafe-rtlunicodestringvalidate
@@ -36,6 +38,17 @@
 // Ref: https://learn.microsoft.com/en-us/windows/win32/learnwin32/dpi-and-device-independent-pixels
 // "The standard DPI settings are 100% (96 DPI)"
 #define DEFAULT_DPI 96
+
+#define RECT_WIDTH(/* RECT */ rect) \
+    ((rect).right - (rect).left)
+
+#define RECT_HEIGHT(/* RECT */ rect) \
+    ((rect).bottom - (rect).top)
+
+// Usually true on Win32
+#define CHAR_IS_SIGNED = ((bool) (((char) -1) < 0))
+// Usually false on Win32, which makes sense, as wchar_t represents one "code unit" in Unicode UTF-16 on Win32.
+#define WCHAR_IS_SIGNED = ((bool) (((wchar_t) -1) < 0))
 
 // Ref: https://wiki.winehq.org/List_Of_Windows_Messages
 const wchar_t *

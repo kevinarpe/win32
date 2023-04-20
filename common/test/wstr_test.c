@@ -1,5 +1,5 @@
 #include "wstr.h"
-#include "error_exit.h"
+#include "win32_last_error.h"
 #include "test_assert.inc"
 #include <windows.h>  // required for wWinMain()
 #include <stdio.h>    // required for printf()
@@ -210,7 +210,8 @@ static size_t StaticGetFileSize(_In_ const wchar_t *lpFilePath)
                                         NULL);                  // [in, optional] hTemplateFile
     if (INVALID_HANDLE_VALUE == hReadFile)
     {
-        ErrorExit("CreateFile(lpFilePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"CreateFile(lpFilePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)");  // _In_ const wchar_t *lpMessage
     }
 
     // Ref: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfilesize
@@ -218,12 +219,14 @@ static size_t StaticGetFileSize(_In_ const wchar_t *lpFilePath)
     const DWORD dwFileSize = GetFileSize(hReadFile, lpdwHighFileSize);
     if (INVALID_FILE_SIZE == dwFileSize)
     {
-        ErrorExit("GetFileSize");
+        Win32LastErrorFPutWSAbort(stderr,           // _In_ FILE          *lpStream
+                                  L"GetFileSize");  // _In_ const wchar_t *lpMessage
     }
 
     if (!CloseHandle(hReadFile))
     {
-        ErrorExit("CloseHandle(hReadFile)");
+        Win32LastErrorFPutWSAbort(stderr,                      // _In_ FILE          *lpStream
+                                  L"CloseHandle(hReadFile)");  // _In_ const wchar_t *lpMessage
     }
 
     return dwFileSize;
@@ -353,30 +356,30 @@ static void TestWStrConcatMany(const wchar_t     *lpTestDesc,
     }
 }
 
-static void TestWStrSprintf(const wchar_t *lpExpectedDestWCharArr,
+static void TestWStrSPrintF(const wchar_t *lpExpectedDestWCharArr,
                             struct WStr   *lpDestWStr,
                             const wchar_t *lpFormatWCharArr,
                             const wchar_t *lpArgsDescWCharArr)
 {
-    printf("TestWStrSprintf: [%ls] == WStrSprintf([%ls], %ls)\r\n", lpExpectedDestWCharArr, lpFormatWCharArr, lpArgsDescWCharArr);
+    printf("TestWStrSPrintF: [%ls] == WStrSPrintF([%ls], %ls)\r\n", lpExpectedDestWCharArr, lpFormatWCharArr, lpArgsDescWCharArr);
 
     assert(0 == wcscmp(lpExpectedDestWCharArr, lpDestWStr->lpWCharArr));
     
     WStrFree(lpDestWStr);
 }
 
-static void TestWStrSprintfV(const wchar_t *lpExpectedDestWCharArr,
+static void TestWStrSPrintFV(const wchar_t *lpExpectedDestWCharArr,
                              const wchar_t *lpFormatWCharArr,
                              const wchar_t *lpArgsDescWCharArr,
                              ...)
 {
-    printf("TestWStrSprintfV: [%ls] == WStrSprintfV([%ls], %ls)\r\n", lpExpectedDestWCharArr, lpFormatWCharArr, lpArgsDescWCharArr);
+    printf("TestWStrSPrintFV: [%ls] == WStrSPrintFV([%ls], %ls)\r\n", lpExpectedDestWCharArr, lpFormatWCharArr, lpArgsDescWCharArr);
 
     va_list ap;
     va_start(ap, lpArgsDescWCharArr);
 
     struct WStr destWStr = {0};
-    WStrSprintfV(&destWStr, lpFormatWCharArr, ap);
+    WStrSPrintFV(&destWStr, lpFormatWCharArr, ap);
 
     va_end(ap);
 
@@ -689,35 +692,35 @@ int WINAPI wWinMain(__attribute__((unused)) HINSTANCE hInstance,      // The ope
     }
     {
         struct WStr destWStr = {0};
-        WStrSprintf(&destWStr, L"abc%d%ls", 123, L"def");
-        TestWStrSprintf(L"abc123def", &destWStr, L"abc%d%ls", L"123, L\"def\"");
+        WStrSPrintF(&destWStr, L"abc%d%ls", 123, L"def");
+        TestWStrSPrintF(L"abc123def", &destWStr, L"abc%d%ls", L"123, L\"def\"");
     }
     {
         struct WStr destWStr = {0};
-        WStrSprintf(&destWStr, L"");
-        TestWStrSprintf(L"", &destWStr, L"", L"");
+        WStrSPrintF(&destWStr, L"");
+        TestWStrSPrintF(L"", &destWStr, L"", L"");
     }
     {
         struct WStr destWStr = {0};
-        WStrSprintf(&destWStr, L"abc123def");
-        TestWStrSprintf(L"abc123def", &destWStr, L"abc123def", L"");
+        WStrSPrintF(&destWStr, L"abc123def");
+        TestWStrSPrintF(L"abc123def", &destWStr, L"abc123def", L"");
     }
     {
         struct WStr destWStr = {0};
-        WStrSprintf(&destWStr, L"%ls", L"abc123def");
-        TestWStrSprintf(L"abc123def", &destWStr, L"%ls", L"L\"abc123def\"");
+        WStrSPrintF(&destWStr, L"%ls", L"abc123def");
+        TestWStrSPrintF(L"abc123def", &destWStr, L"%ls", L"L\"abc123def\"");
     }
     {
         struct WStr destWStr = {0};
-        WStrSprintf(&destWStr, L"%ls%ls%ls", L"abc", L"123", L"def");
-        TestWStrSprintf(L"abc123def", &destWStr, L"%ls%ls%ls", L"L\"abc\", L\"123\", L\"def\"");
+        WStrSPrintF(&destWStr, L"%ls%ls%ls", L"abc", L"123", L"def");
+        TestWStrSPrintF(L"abc123def", &destWStr, L"%ls%ls%ls", L"L\"abc\", L\"123\", L\"def\"");
     }
 
-    TestWStrSprintfV(L"abc123def", L"abc%d%ls", L"123, L\"def\"", 123, L"def");
-    TestWStrSprintfV(L"", L"", L"");
-    TestWStrSprintfV(L"abc123def", L"abc123def", L"");
-    TestWStrSprintfV(L"abc123def", L"%ls", L"L\"abc123def\"", L"abc123def");
-    TestWStrSprintfV(L"abc123def", L"%ls%ls%ls", L"L\"abc\", L\"123\", L\"def\"", L"abc", L"123", L"def");
+    TestWStrSPrintFV(L"abc123def", L"abc%d%ls", L"123, L\"def\"", 123, L"def");
+    TestWStrSPrintFV(L"", L"", L"");
+    TestWStrSPrintFV(L"abc123def", L"abc123def", L"");
+    TestWStrSPrintFV(L"abc123def", L"%ls", L"L\"abc123def\"", L"abc123def");
+    TestWStrSPrintFV(L"abc123def", L"%ls%ls%ls", L"L\"abc\", L\"123\", L\"def\"", L"abc", L"123", L"def");
 
     TestWStrCompareEqual(NULL, NULL);
     TestWStrCompareEqual(L"", NULL);

@@ -1,5 +1,5 @@
 #include "win32_dpi.h"
-#include "error_exit.h"
+#include "win32_last_error.h"
 #include "log.h"
 #include <assert.h>
 
@@ -27,7 +27,9 @@ Win32DPIGet(_Inout_ struct Win32DPI *lpDpi,
     const DPI_AWARENESS dpiAwareness = GetAwarenessFromDpiAwarenessContext(dpiCx);
     if (DPI_AWARENESS_INVALID == dpiAwareness)
     {
-        ErrorExitWF(L"Win32DPIGet: DPI_AWARENESS_INVALID[%d] == GetAwarenessFromDpiAwarenessContext(...)", DPI_AWARENESS_INVALID);
+        Win32LastErrorFPrintFWAbort(stderr,                  // _In_ FILE          *lpStream
+                                    L"Win32DPIGet: DPI_AWARENESS_INVALID[%d] == GetAwarenessFromDpiAwarenessContext(...)",  // _In_ const wchar_t *lpMessageFormat
+                                    DPI_AWARENESS_INVALID);  // ...
     }
 
     // Default: 96, but frequently higher for 4K montiors, e.g., 144
@@ -36,11 +38,6 @@ Win32DPIGet(_Inout_ struct Win32DPI *lpDpi,
     // Ref: https://learn.microsoft.com/en-us/windows/win32/api/windef/ne-windef-dpi_awareness
     switch (dpiAwareness)
     {
-        case DPI_AWARENESS_INVALID:
-        {
-            ErrorExitWF(L"Win32DPIGet: DPI_AWARENESS_INVALID[%d] == GetAwarenessFromDpiAwarenessContext(...)", DPI_AWARENESS_INVALID);
-            break;
-        }
         case DPI_AWARENESS_UNAWARE:
         case DPI_AWARENESS_SYSTEM_AWARE:
         {
@@ -52,11 +49,19 @@ Win32DPIGet(_Inout_ struct Win32DPI *lpDpi,
         {
             // Ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getdpiforwindow
             dpi = GetDpiForWindow(hWnd);  // [in] HWND hwnd
+            if (0 == dpi)
+            {
+                Win32LastErrorFPrintFWAbort(stderr,         // _In_ FILE          *lpStream
+                                            L"Win32DPIGet: 0 == GetDpiForWindow(hWnd:%p): Invalid HWND",  // _In_ const wchar_t *lpMessageFormat
+                                            dpiAwareness);  // ...
+            }
             break;
         }
         default:
         {
-            ErrorExitWF(L"Win32DPIGet: Unknown DPI_AWARENESS[%d] == GetAwarenessFromDpiAwarenessContext(...)", dpiAwareness);
+            Win32LastErrorFPrintFWAbort(stderr,         // _In_ FILE          *lpStream
+                                        L"Win32DPIGet: Unknown DPI_AWARENESS[%d] == GetAwarenessFromDpiAwarenessContext(...)",  // _In_ const wchar_t *lpMessageFormat
+                                        dpiAwareness);  // ...
         }
     }
 

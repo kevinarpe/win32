@@ -16,6 +16,7 @@ main()
 
     bashlib_log_and_run_cmd \
         ../build.bash
+#        echo ../build.bash
 
     local csrc
     for csrc in *_test.c
@@ -46,7 +47,7 @@ build_then_run()
         -o "$test_module.exe" \
         "$COMMON_DIR_PATH/"*.o \
         "$test_module.o" \
-        -lgdi32
+        -lgdi32 -lole32
 
     bashlib_log_and_run_cmd \
         ls -l "$test_module.exe"

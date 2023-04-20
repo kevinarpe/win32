@@ -1,60 +1,110 @@
-#include "wstr.h"
+#include "wstr2.h"
+#include "error_exit.h"
 #include "xmalloc.h"
 #include "log.h"
-#include "win32_last_error.h"
+#include "assertive.h"
 #include <assert.h>
 #include <windows.h>
 #include <errno.h>
 
+const wchar_t *ESTR_ALLOC_TO_WCHAR_ARR_MAP[] = {
+    L"WSTR_ALLOC_UNKNOWN",  // 0
+    L"WSTR_ALLOC_LITERAL",  // 1
+    L"WSTR_ALLOC_STACK",    // 2
+    L"WSTR_ALLOC_HEAP",     // 3
+};
+
+// write to 'lpDestWCharArr'
 void
-SafeWCharArrCopy(_Out_ wchar_t       *lpDestWCharArr,                // dest wstr ptr
-                 _In_  size_t         ulDestWCharArrLenPlusNulChar,  // dest wstr length (including null char)
-                 _In_  const wchar_t *lpSrcWCharArr,                 // source wstr ptr
-                 _In_  const size_t   ulWCharCount)                  // wchar count to be copied (excluding null char)
+SafeWCharArrCopy(_Out_ wchar_t       *lpDestWCharArr,
+                 _In_  size_t         ulDestWCharArrLenPlusNullChar,
+                 _In_  const wchar_t *lpSrcWCharArr,
+                 _In_  const size_t   ulWCharCount)
 {
+    assert(NULL != lpDestWCharArr);
+    assert(0 != ulDestWCharArrLenPlusNullChar);
+    assert(NULL != lpSrcWCharArr);
+
+    if (_TRUNCATE != ulWCharCount)
+    {
+        AssertWF(ulWCharCount + 1 > ulDestWCharArrLenPlusNullChar,                                                 // _In_ const bool     bAssertResult
+                 L"Insufficient buffer size to copy: ulWCharCount[%zd] + 1 > ulDestWCharArrLenPlusNullChar[%zd]"   // _In_ const wchar_t *lpMessageFormatWCharArr
+                 L"\r\n\tlpDestWCharArr[%zd]: [%ld]"
+                 L"\r\n\tlpSrcWCharArr [%zd]: [%ld]",
+                 ulWCharCount, ulDestWCharArrLenPlusNullChar, lpDestWCharArr, lpSrcWCharArr);                      // _In_ ...
+    }
+
     // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/strncpy-s-strncpy-s-l-wcsncpy-s-wcsncpy-s-l-mbsncpy-s-mbsncpy-s-l?view=msvc-170
     const errno_t e = wcsncpy_s(lpDestWCharArr,
-                                ulDestWCharArrLenPlusNulChar,
+                                ulDestWCharArrLenPlusNullChar,
                                 lpSrcWCharArr,
                                 ulWCharCount);
-    if (0 != e)
+
+    // Note: If _TRUNCATE == ulWCharCount, then 'e' will be STRUNCATE (!= 0) on truncate.
+    if (0 != e && _TRUNCATE != ulWCharCount)
     {
         // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/strerror-strerror-wcserror-wcserror?view=msvc-170
         const wchar_t *lpErrWCharArr = _wcserror(e);
-        Win32LastErrorFPrintFWAbort(stderr,  // _In_ FILE          *lpStream,
-                                    L"Fatal error: wcsncpy_s(..., ulDestWCharArrLenPlusNulChar[%zd], lpSrcWCharArr[%ls], ulWCharCount[%zd]) -> %d: [%ls]",  // _In_ const wchar_t *lpMessageFormat,
-                                    ulDestWCharArrLenPlusNulChar, lpSrcWCharArr, ulWCharCount, e, lpErrWCharArr);  // _In_ ...
+        LogWF(stderr, L"Fatal error: wcsncpy_s(..., ulDestWCharArrLenPlusNullChar[%zd], lpSrcWCharArr[%ls], ulWCharCount[%zd]) -> %d: [%ls]",
+              ulDestWCharArrLenPlusNullChar, lpSrcWCharArr, ulWCharCount, e, lpErrWCharArr);
+        abort();
     }
 }
 
+// read-only
 void
 WStrAssertValid(_In_ const struct WStr *lpWStr)
 {
     assert(NULL != lpWStr);
-    if (lpWStr->ulSize > 0)
+    assert(lpWStr->allocFlag >= WSTR_ALLOC_UNKNOWN && lpWStr->allocFlag <= WSTR_ALLOC_HEAP);
+
+    // The shortest valid string literal and stack-allocated string buffer is "".  NULL is not allowed/possible.
+    if ((0 == lpWStr->ulSize && (WSTR_ALLOC_LITERAL == lpWStr->allocFlag || WSTR_ALLOC_STACK == lpWStr->allocFlag))
+        || lpWStr->ulSize > 0)
     {
         assert(NULL != lpWStr->lpWCharArr);
     }
 }
 
+// read-only
+static void
+StaticWStrAssertCanWrite(_In_ const struct WStr *lpWStr)
+{
+    WStrAssertValid(lpWStr);  // _In_ const struct WStr *lpWStr
+/*
+    AssertWF(WSTR_ALLOC_STACK == lpWStr->allocFlag || WSTR_ALLOC_HEAP == lpWStr->allocFlag,   // _In_ const bool     bAssertResult
+             L"lpWStr->allocFlag[%d] not in [WSTR_ALLOC_UNKNOWN/%d, WSTR_ALLOC_LITERAL/%d]",  // _In_ const wchar_t *lpMessageFormatWCharArr
+             lpWStr->allocFlag, WSTR_ALLOC_UNKNOWN, WSTR_ALLOC_LITERAL);                      // _In_ ...
+*/
+    AssertWF(WSTR_ALLOC_HEAP == lpWStr->allocFlag,             // _In_ const bool     bAssertResult
+             L"WSTR_ALLOC_HEAP[%d] == lpWStr->allocFlag[%d]",  // _In_ const wchar_t *lpMessageFormatWCharArr
+             WSTR_ALLOC_HEAP, lpWStr->allocFlag);              // _In_ ...
+}
+
+// write to 'lpWStr'
 void
 WStrFree(_Inout_ struct WStr *lpWStr)
 {
     WStrAssertValid(lpWStr);
 
-    xfree((void **) &(lpWStr->lpWCharArr));
-    lpWStr->ulSize = 0;  // Explicit
+    if (WSTR_ALLOC_HEAP == lpWStr->allocFlag && NULL != lpWStr->lpWCharArr)
+    {
+        xfree((void **) &(lpWStr->lpWCharArr));
+        lpWStr->ulSize = 0;  // Explicit
+    }
 }
 
-BOOL
+// read-only
+bool
 WStrIsEmpty(_In_ const struct WStr *lpWStr)
 {
     WStrAssertValid(lpWStr);
 
-    const BOOL x = (0 == lpWStr->ulSize);
+    const bool x = (0 == lpWStr->ulSize);
     return x;
 }
 
+// read-only
 int
 WStrCompare(_In_ const struct WStr *lpWStrLeft,
             _In_ const struct WStr *lpWStrRight)
@@ -69,16 +119,21 @@ WStrCompare(_In_ const struct WStr *lpWStrLeft,
     return cmp;
 }
 
+// write to 'lpDestWStr'
 static void
 WStrCopyWCharArr0(_Inout_ struct WStr   *lpDestWStr,
                   _In_    const wchar_t *lpSrcWCharArr,
                   _In_    const size_t   ulSrcSize)
 {
+    StaticWStrAssertCanWrite(lpDestWStr);
     WStrFree(lpDestWStr);
     // Intentional: Allow (NULL == lpSrcWCharArr)
 
     lpDestWStr->ulSize = ulSrcSize;
-    if (0 == ulSrcSize) {
+    if (0 == ulSrcSize)
+    {
+        xfree((void **) &(lpDestWStr->lpWCharArr));
+        lpDestWStr->ulSize = 0;  // Explicit
         return;
     }
 
@@ -90,12 +145,12 @@ WStrCopyWCharArr0(_Inout_ struct WStr   *lpDestWStr,
                      ulSrcSize);
 }
 
+// write to 'lpDestWStr'
 void
 WStrCopyWCharArr(_Inout_ struct WStr   *lpDestWStr,
                  _In_    const wchar_t *lpSrcWCharArr,
                  _In_    const size_t   ulSrcSize)
 {
-//    assert(NULL != lpSrcWCharArr);
     if (NULL == lpSrcWCharArr)
     {
         assert(0 == ulSrcSize);
@@ -104,6 +159,7 @@ WStrCopyWCharArr(_Inout_ struct WStr   *lpDestWStr,
     WStrCopyWCharArr0(lpDestWStr, lpSrcWCharArr, ulSrcSize);
 }
 
+// write to 'lpDestWStr'
 void
 WStrCopyWStr(_Inout_ struct WStr       *lpDestWStr,
              _In_    const struct WStr *lpSrcWStr)
@@ -113,11 +169,11 @@ WStrCopyWStr(_Inout_ struct WStr       *lpDestWStr,
     WStrCopyWCharArr0(lpDestWStr, lpSrcWStr->lpWCharArr, lpSrcWStr->ulSize);
 }
 
+// write to 'lpDestWStr'
 void
 WStrSPrintF(_Inout_ struct WStr   *lpDestWStr,
             // @EmptyStringAllowed
-            _In_    const wchar_t *lpFormatWCharArr,
-            _In_    ...)
+            _In_    const wchar_t *lpFormatWCharArr, ...)
 {
     // Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/va-arg-va-copy-va-end-va-start?view=msvc-172
     va_list ap;
@@ -131,12 +187,12 @@ WStrSPrintF(_Inout_ struct WStr   *lpDestWStr,
     }
 }
 
+// write to 'lpDestWStr'
 bool
 WStrSPrintF2(_Inout_ struct WStr   *lpDestWStr,
              _In_    FILE          *lpErrorStream,
              // @EmptyStringAllowed
-             _In_    const wchar_t *lpFormatWCharArr,
-             _In_    ...)
+             _In_    const wchar_t *lpFormatWCharArr, ...)
 {
     // Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/va-arg-va-copy-va-end-va-start?view=msvc-172
     va_list ap;
@@ -149,6 +205,7 @@ WStrSPrintF2(_Inout_ struct WStr   *lpDestWStr,
     return b;
 }
 
+// write to 'lpDestWStr'
 void
 WStrSPrintFV(_Inout_ struct WStr   *lpDestWStr,
              // @EmptyStringAllowed
@@ -164,6 +221,8 @@ WStrSPrintFV(_Inout_ struct WStr   *lpDestWStr,
     }
 }
 
+// TODO: Should we allow nullable lpErrorStream that implies do not write error message on failure?
+// write to 'lpDestWStr'
 bool
 WStrSPrintFV2(_Inout_ struct WStr   *lpDestWStr,
               _In_    FILE          *lpErrorStream,
@@ -171,6 +230,7 @@ WStrSPrintFV2(_Inout_ struct WStr   *lpDestWStr,
               _In_    const wchar_t *lpFormatWCharArr,
               _In_    va_list        ap)
 {
+    StaticWStrAssertCanWrite(lpDestWStr);
     WStrFree(lpDestWStr);
     assert(NULL != lpErrorStream);
     assert(NULL != lpFormatWCharArr);
@@ -194,10 +254,10 @@ WStrSPrintFV2(_Inout_ struct WStr   *lpDestWStr,
 
     if (cch < 0)
     {
-        Win32LastErrorFPrintFW2(lpErrorStream,      // _In_  FILE          *lpStream
-                                lpErrorStream,      // _Out_ FILE          *lpErrorStream
+        Win32LastErrorFPrintFW2(lpErrorStream,      // _In_  FILE          *lpStream,
+                                lpErrorStream,      // _Out_ FILE          *lpErrorStream,
                                 L"Internal error: -1 == vswprintf(NULL, 0, lpFormatWCharArr[%ls], ap_copy)",  // _In_  const wchar_t *lpMessageFormat
-                                lpFormatWCharArr);  // _In_  ...
+                                lpFormatWCharArr);  // ...
         return false;
     }
 
@@ -219,7 +279,7 @@ WStrSPrintFV2(_Inout_ struct WStr   *lpDestWStr,
         Win32LastErrorFPrintFW2(lpErrorStream,                                         // _In_  FILE          *lpStream
                                 lpErrorStream,                                         // _Out_ FILE          *lpErrorStream
                                 L"Internal error: -1 == vswprintf(lpDestWStr->lpWCharArr, lpDestWStr->ulSize + LEN_NUL_CHAR[%zd], lpFormatWCharArr[%ls], ap_copy)",  // _In_  const wchar_t *lpMessageFormat
-                                lpDestWStr->ulSize + LEN_NUL_CHAR, lpFormatWCharArr);  // _In_  ...
+                                lpDestWStr->ulSize + LEN_NUL_CHAR, lpFormatWCharArr);  // ...
         return false;
     }
 
@@ -233,11 +293,13 @@ WStrSPrintFV2(_Inout_ struct WStr   *lpDestWStr,
     return true;
 }
 
+// write to 'lpDestWStr'
 void
 WStrConcat(_Inout_ struct WStr       *lpDestWStr,
            _In_    const struct WStr *lpSrcWStr,
            _In_    const struct WStr *lpSrcWStr2)
 {
+    StaticWStrAssertCanWrite(lpDestWStr);
     WStrAssertValid(lpSrcWStr);
     WStrAssertValid(lpSrcWStr2);
 
@@ -261,12 +323,13 @@ WStrConcat(_Inout_ struct WStr       *lpDestWStr,
                      lpSrcWStr2->ulSize);
 }
 
+// write to 'lpDestWStr'
 void
 WStrConcatMany(_Inout_ struct WStr       *lpDestWStr,
                _In_    const struct WStr *lpSrcWStr,
-               _In_    const struct WStr *lpSrcWStr2,
-               _In_    ...)
+               _In_    const struct WStr *lpSrcWStr2, ...)
 {
+    StaticWStrAssertCanWrite(lpDestWStr);
     WStrAssertValid(lpSrcWStr);
     WStrAssertValid(lpSrcWStr2);
 
@@ -328,12 +391,13 @@ WStrConcatMany(_Inout_ struct WStr       *lpDestWStr,
     va_end(ap2);
 }
 
+// write to 'lpWStr'
 void
 WStrTrim(_Inout_ struct WStr                 *lpWStr,
          _In_    const enum EWStrTrim         eWStrTrim,
          _In_    const WStrCharPredicateFunc  fpWStrCharPredicateFunc)
 {
-    WStrAssertValid(lpWStr);
+    StaticWStrAssertCanWrite(lpWStr);
     assert(eWStrTrim >= WSTR_LTRIM && eWStrTrim <= (WSTR_LTRIM | WSTR_RTRIM));
     assert(NULL != fpWStrCharPredicateFunc);
 
@@ -471,9 +535,8 @@ WStrSplit0(_In_    const struct WStr             *lpWStrText,
 
     if (UNLIMITED_MIN_TOKEN_COUNT != lpOptions->iMinTokenCount && ulTokenCount < ((size_t) lpOptions->iMinTokenCount))
     {
-        Win32LastErrorFPrintFWAbort(stderr,  // _In_ FILE          *lpStream,
-                                    L"ERROR: Failed to split [%ls] with delim [%ls]: ulTokenCount < lpOptions->iMinTokenCount: %lu < %d",  // _In_ const wchar_t *lpMessageFormat,
-                                    lpWStrText->lpWCharArr, lpWStrDelim->lpWCharArr, ulTokenCount, lpOptions->iMinTokenCount);             // _In_ ...
+        ErrorExitWF(L"ERROR: Failed to split [%ls] with delim [%ls]: ulTokenCount < lpOptions->iMinTokenCount: %lu < %d",
+                    lpWStrText->lpWCharArr, lpWStrDelim->lpWCharArr, ulTokenCount, lpOptions->iMinTokenCount);
     }
 
     WStrArrAlloc(lpTokenWStrArr, ulTokenCount);
@@ -618,9 +681,7 @@ WStrFileWrite(_In_ const wchar_t     *lpFilePath,
                                          NULL);                  // [in, optional] hTemplateFile
     if (INVALID_HANDLE_VALUE == hWriteFile)
     {
-        Win32LastErrorFPrintFWAbort(stderr,       // _In_ FILE          *lpStream,
-                                    L"CreateFile(lpFilePath[%ls], GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)",  // _In_ const wchar_t *lpMessageFormat,
-                                    lpFilePath);  // _In_ ...
+        ErrorExitWF(L"CreateFile(lpFilePath[%ls], GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)", lpFilePath);
     }
 
     if (lpWStr->ulSize > 0)
@@ -638,9 +699,8 @@ WStrFileWrite(_In_ const wchar_t     *lpFilePath,
         assert(iCharArrLen >= 0);
         if (0 == iCharArrLen)
         {
-            Win32LastErrorFPrintFWAbort(stderr,                         // _In_ FILE          *lpStream,
-                                        L"WideCharToMultiByte(codePage[%ud], WC_ERR_INVALID_CHARS, lpWStr->lpWCharArr[%ld], -1, NULL, 0, NULL, NULL))",  // _In_ const wchar_t *lpMessageFormat,
-                                        codePage, lpWStr->lpWCharArr);  // _In_ ...
+            ErrorExitWF(L"WideCharToMultiByte(codePage[%ud], WC_ERR_INVALID_CHARS, lpWStr->lpWCharArr[%ld], -1, NULL, 0, NULL, NULL))",
+                        codePage, lpWStr->lpWCharArr);
         }
 
         // Important: WriteFile() only writes chars not wchars.
@@ -660,9 +720,8 @@ WStrFileWrite(_In_ const wchar_t     *lpFilePath,
         assert(iCharArrLen2 >= 0);
         if (0 == iCharArrLen2)
         {
-            Win32LastErrorFPrintFWAbort(stderr,                         // _In_ FILE          *lpStream,
-                                        L"WideCharToMultiByte(codePage[%ud], WC_ERR_INVALID_CHARS, lpWStr->lpWCharArr[%ld], -1, lpCharArr, ulCharArrLen, NULL, NULL))",  // _In_ const wchar_t *lpMessageFormat,
-                                        codePage, lpWStr->lpWCharArr);  // _In_ ...
+            ErrorExitWF(L"WideCharToMultiByte(codePage[%ud], WC_ERR_INVALID_CHARS, lpWStr->lpWCharArr[%ld], -1, lpCharArr, ulCharArrLen, NULL, NULL))",
+                        codePage, lpWStr->lpWCharArr);
         }
         assert(iCharArrLen == iCharArrLen2);
 
@@ -674,8 +733,7 @@ WStrFileWrite(_In_ const wchar_t     *lpFilePath,
                        &numberOfBytesWritten,        // [out/opt] LPDWORD lpNumberOfBytesWritten
                        NULL))                        // [in/out/opt] LPOVERLAPPED lpOverlapped
         {
-            Win32LastErrorFPutWSAbort(stderr,         // _In_ FILE          *lpStream
-                                      L"WriteFile");  // _In_ const wchar_t *lpMessage
+            ErrorExitW(L"WriteFile");
         }
 
         xfree((void **) &lpCharArr);
@@ -683,8 +741,7 @@ WStrFileWrite(_In_ const wchar_t     *lpFilePath,
 
     if (!CloseHandle(hWriteFile))
     {
-        Win32LastErrorFPutWSAbort(stderr,                       // _In_ FILE          *lpStream
-                                  L"CloseHandle(hWriteFile)");  // _In_ const wchar_t *lpMessage
+        ErrorExitW(L"CloseHandle(hWriteFile)");
     }
 }
 
@@ -697,7 +754,7 @@ WStrFileRead(_In_    const wchar_t *lpFilePathWCharArr,
     WStrFree(lpDestWStr);
 
     // Ref: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
-    const HANDLE hReadFile = CreateFile(lpFilePathWCharArr,     // [in] LPCWSTR lpFileName
+    const HANDLE hReadFile = CreateFile(lpFilePathWCharArr,             // [in] LPCWSTR lpFileName
                                         GENERIC_READ,           // [in] DWORD dwDesiredAccess
                                         FILE_SHARE_READ,        // [in] DWORD dwShareMode
                                         NULL,                   // [in, optional] LPSECURITY_ATTRIBUTES lpSecurityAttributes
@@ -706,9 +763,7 @@ WStrFileRead(_In_    const wchar_t *lpFilePathWCharArr,
                                         NULL);                  // [in, optional] hTemplateFile
     if (INVALID_HANDLE_VALUE == hReadFile)
     {
-        Win32LastErrorFPrintFWAbort(stderr,               // _In_ FILE          *lpStream,
-                                    L"CreateFile(lpFileName[%ls], GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)",  // _In_ const wchar_t *lpMessageFormat,
-                                    lpFilePathWCharArr);  // _In_ ...
+        ErrorExitWF(L"CreateFile(lpFileName[%ls], GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)", lpFilePathWCharArr);
     }
 
     // Ref: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfilesize
@@ -716,18 +771,14 @@ WStrFileRead(_In_    const wchar_t *lpFilePathWCharArr,
     const DWORD dwFileSize = GetFileSize(hReadFile, lpdwHighFileSize);
     if (INVALID_FILE_SIZE == dwFileSize)
     {
-        Win32LastErrorFPrintFWAbort(stderr,                           // _In_ FILE          *lpStream
-                                    L"GetFileSize(lpFileName[%ls])",  // _In_ const wchar_t *lpMessageFormat
-                                    lpFilePathWCharArr);              // _In_ ...
+        ErrorExitWF(L"GetFileSize(lpFileName[%ls])", lpFilePathWCharArr);
     }
 
     if (0 == dwFileSize)
     {
         if (!CloseHandle(hReadFile))
         {
-            Win32LastErrorFPrintFWAbort(stderr,                                      // _In_ FILE          *lpStream
-                                        L"CloseHandle(hReadFile, lpFileName[%ls])",  // _In_ const wchar_t *lpMessageFormat
-                                        lpFilePathWCharArr);                         // _In_ ...
+            ErrorExitWF(L"CloseHandle(hReadFile, lpFileName[%ls])", lpFilePathWCharArr);
         }
         // Above, WStrFree(lpDestWStr) is called.  Thus, lpDestWStr has zero length.
         return;
@@ -742,18 +793,14 @@ WStrFileRead(_In_    const wchar_t *lpFilePathWCharArr,
     DWORD dwNumberOfBytesRead = 0;
     if (!ReadFile(hReadFile, lpCharArr, ulCharArrLen, &dwNumberOfBytesRead, NULL))
     {
-        Win32LastErrorFPrintFWAbort(stderr,                       // _In_ FILE          *lpStream
-                                    L"ReadFile(lpFileName:%ls)",  // _In_ const wchar_t *lpMessageFormat
-                                    lpFilePathWCharArr);          // _In_ ...
+        ErrorExitWF(L"ReadFile(lpFileName:%ls)", lpFilePathWCharArr);
     }
     assert(dwFileSize == dwNumberOfBytesRead);
     lpCharArr[dwNumberOfBytesRead] = '\0';
 
     if (!CloseHandle(hReadFile))
     {
-        Win32LastErrorFPrintFWAbort(stderr,                                     // _In_ FILE          *lpStream
-                                    L"CloseHandle(hReadFile, lpFileName:%ls)",  // _In_ const wchar_t *lpMessageFormat
-                                    lpFilePathWCharArr);                        // _In_ ...
+        ErrorExitWF(L"CloseHandle(hReadFile, lpFileName:%ls)", lpFilePathWCharArr);
     }
 
     // Note: "BOM" == byte order mark
@@ -765,23 +812,19 @@ WStrFileRead(_In_    const wchar_t *lpFilePathWCharArr,
     }
     else if (dwFileSize >= 4 && ((char) 0xFF) == lpCharArr[0] && ((char) 0xFE) == lpCharArr[1] && ((char) 0x00) == lpCharArr[2] && ((char) 0x00) == lpCharArr[3])
     {
-        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
-                                  L"UTF-32LE (little endian) BOM (byte order mark) is not supported!");  // _In_ const wchar_t *lpMessage
+        ErrorExitW(L"UTF-32LE (little endian) BOM (byte order mark) is not supported!");
     }
     else if (dwFileSize >= 4 && ((char) 0x00) == lpCharArr[0] && ((char) 0x00) == lpCharArr[1] && ((char) 0xFF) == lpCharArr[2] && ((char) 0xFE) == lpCharArr[3])
     {
-        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
-                                  L"UTF-32BE (big endian) BOM (byte order mark) is not supported!");  // _In_ const wchar_t *lpMessage
+        ErrorExitW(L"UTF-32BE (big endian) BOM (byte order mark) is not supported!");
     }
     else if (dwFileSize >= 2 && ((char) 0xFF) == lpCharArr[0] && ((char) 0xFE) == lpCharArr[1])
     {
-        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
-                                  L"UTF-16LE (little endian) BOM (byte order mark) is not supported!");  // _In_ const wchar_t *lpMessage
+        ErrorExitW(L"UTF-16LE (little endian) BOM (byte order mark) is not supported!");
     }
     else if (dwFileSize >= 2 && ((char) 0xFE) == lpCharArr[0] && ((char) 0xFF) == lpCharArr[1])
     {
-        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
-                                  L"UTF-16BE (big endian) BOM (byte order mark) is not supported!");  // _In_ const wchar_t *lpMessage
+        ErrorExitW(L"UTF-16BE (big endian) BOM (byte order mark) is not supported!");
     }
 
     // Ref: https://docs.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-multibytetowidechar
@@ -796,9 +839,7 @@ WStrFileRead(_In_    const wchar_t *lpFilePathWCharArr,
     assert(iWCharArrLen >= 0);
     if (0 == iWCharArrLen)
     {
-        Win32LastErrorFPrintFWAbort(stderr,     // _In_ FILE          *lpStream,
-                                    L"MultiByteToWideChar(codePage[%ud], MB_ERR_INVALID_CHARS, lpCharArrAfterBOM, -1, NULL, 0)",  // _In_ const wchar_t *lpMessageFormat,
-                                    codePage);  // _In_ ...
+        ErrorExitWF(L"MultiByteToWideChar(codePage[%ud], MB_ERR_INVALID_CHARS, lpCharArrAfterBOM, -1, NULL, 0)", codePage);
     }
 
     wchar_t* lpWCharArr = xcalloc(iWCharArrLen, sizeof(wchar_t));
@@ -813,9 +854,7 @@ WStrFileRead(_In_    const wchar_t *lpFilePathWCharArr,
     assert(iWCharArrLen2 >= 0);
     if (0 == iWCharArrLen2)
     {
-        Win32LastErrorFPrintFWAbort(stderr,     // _In_ FILE          *lpStream,
-                                    L"MultiByteToWideChar(codePage[%ud], MB_ERR_INVALID_CHARS, lpCharArrAfterBOM, lpWCharArr, iWCharArrLen)",  // _In_ const wchar_t *lpMessageFormat,
-                                    codePage);  // _In_ ...
+        ErrorExitWF(L"MultiByteToWideChar(codePage[%ud], MB_ERR_INVALID_CHARS, lpCharArrAfterBOM, lpWCharArr, iWCharArrLen)", codePage);
     }
     assert(iWCharArrLen == iWCharArrLen2);
 

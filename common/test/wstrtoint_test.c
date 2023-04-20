@@ -12,7 +12,7 @@ static void TestWStrTryParseToUInt8(_In_ wchar_t       *lpWCharArr,
 
     struct WStr wstrText = {.lpWCharArr = lpWCharArr, .ulSize = wcslen(lpWCharArr)};
     uint8_t ucResult = 0;
-    const BOOL bResult = WStrTryParseToUInt8(&wstrText, base, &ucResult, stderr, "ERROR: Failed to parse text [%ls] as uint8_t", lpWCharArr);
+    const BOOL bResult = WStrTryParseToUInt8(&wstrText, base, &ucResult, stderr, L"ERROR: Failed to parse text [%ls] as uint8_t", lpWCharArr);
     assert(bExpectedResult == bResult);
     if (!bResult) {
         return;

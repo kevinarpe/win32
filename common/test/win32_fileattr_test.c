@@ -1,17 +1,17 @@
-#include "fileattr.h"
+#include "win32_fileattr.h"
 #include "test_assert.inc"
 #include <windows.h>  // required for wWinMain()
 #include <stdio.h>    // required for printf()
 #include <assert.h>   // required for assert()
 
-static void TestFileAttrMaskToWStrArr(_In_ const DWORD     dwFileAttrMask,
+static void TestWin32FileAttrMaskToWStrArr(_In_ const DWORD     dwFileAttrMask,
                                       _In_ const wchar_t **lppExpectedArr,
                                       _In_ const size_t    ulExpectedCount)
 {
-    printf("TestFileAttrMaskToWStrArr: dwFileAttrMask[%ld]\n", dwFileAttrMask);
+    printf("TestWin32FileAttrMaskToWStrArr: dwFileAttrMask[%ld]\n", dwFileAttrMask);
 
     struct WStrArr wstrArr = {};
-    FileAttrMaskToWStrArr(dwFileAttrMask, &wstrArr);
+    Win32FileAttrMaskToWStrArr(dwFileAttrMask, &wstrArr);
 
     AssertWStrArrEqual(&wstrArr, lppExpectedArr, ulExpectedCount);
 }
@@ -36,25 +36,25 @@ int WINAPI wWinMain(__attribute__((unused)) HINSTANCE hInstance,      // The ope
 }
 {
     const wchar_t *lppExpectedOutputArr[] = {L"INVALID_FILE_ATTRIBUTES"};
-    TestFileAttrMaskToWStrArr(INVALID_FILE_ATTRIBUTES, lppExpectedOutputArr, sizeof(lppExpectedOutputArr) / sizeof(lppExpectedOutputArr[0]));
+    TestWin32FileAttrMaskToWStrArr(INVALID_FILE_ATTRIBUTES, lppExpectedOutputArr, sizeof(lppExpectedOutputArr) / sizeof(lppExpectedOutputArr[0]));
 }
 {
     const wchar_t *lppExpectedOutputArr[] = {L"FILE_ATTRIBUTE_READONLY"};
-    TestFileAttrMaskToWStrArr(FILE_ATTRIBUTE_READONLY, lppExpectedOutputArr, sizeof(lppExpectedOutputArr) / sizeof(lppExpectedOutputArr[0]));
+    TestWin32FileAttrMaskToWStrArr(FILE_ATTRIBUTE_READONLY, lppExpectedOutputArr, sizeof(lppExpectedOutputArr) / sizeof(lppExpectedOutputArr[0]));
 }
 {
     const wchar_t *lppExpectedOutputArr[] = {L"FILE_ATTRIBUTE_READONLY", L"FILE_ATTRIBUTE_HIDDEN"};
-    TestFileAttrMaskToWStrArr(FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN, lppExpectedOutputArr, sizeof(lppExpectedOutputArr) / sizeof(lppExpectedOutputArr[0]));
-    TestFileAttrMaskToWStrArr(FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_READONLY, lppExpectedOutputArr, sizeof(lppExpectedOutputArr) / sizeof(lppExpectedOutputArr[0]));
+    TestWin32FileAttrMaskToWStrArr(FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN, lppExpectedOutputArr, sizeof(lppExpectedOutputArr) / sizeof(lppExpectedOutputArr[0]));
+    TestWin32FileAttrMaskToWStrArr(FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_READONLY, lppExpectedOutputArr, sizeof(lppExpectedOutputArr) / sizeof(lppExpectedOutputArr[0]));
 }
 {
     const wchar_t *lppExpectedOutputArr[] = {L"FILE_ATTRIBUTE_READONLY", L"FILE_ATTRIBUTE_HIDDEN", L"FILE_ATTRIBUTE_SYSTEM"};
-    TestFileAttrMaskToWStrArr(FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM, lppExpectedOutputArr, sizeof(lppExpectedOutputArr) / sizeof(lppExpectedOutputArr[0]));
+    TestWin32FileAttrMaskToWStrArr(FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM, lppExpectedOutputArr, sizeof(lppExpectedOutputArr) / sizeof(lppExpectedOutputArr[0]));
 }
 {
     const wchar_t *lppExpectedOutputArr[] = {L"FILE_ATTRIBUTE_READONLY", L"FILE_ATTRIBUTE_HIDDEN", L"FILE_ATTRIBUTE_SYSTEM", L"FILE_ATTRIBUTE_INTEGRITY_STREAM"};
     const DWORD dwFILE_ATTRIBUTE_INTEGRITY_STREAM = 0x8000;
-    TestFileAttrMaskToWStrArr(FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM | dwFILE_ATTRIBUTE_INTEGRITY_STREAM, lppExpectedOutputArr, sizeof(lppExpectedOutputArr) / sizeof(lppExpectedOutputArr[0]));
+    TestWin32FileAttrMaskToWStrArr(FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM | dwFILE_ATTRIBUTE_INTEGRITY_STREAM, lppExpectedOutputArr, sizeof(lppExpectedOutputArr) / sizeof(lppExpectedOutputArr[0]));
 }
     return 0;
 }

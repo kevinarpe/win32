@@ -1,5 +1,5 @@
 #include "win32_image.h"
-#include "error_exit.h"
+#include "win32_last_error.h"
 
 HANDLE
 Win32LoadSharedImageByResource(_In_ const wchar_t *lpszImageResource,  // Ex: IDI_APPLICATION
@@ -17,8 +17,9 @@ Win32LoadSharedImageByResource(_In_ const wchar_t *lpszImageResource,  // Ex: ID
                                 LR_SHARED);         // [in] UINT fuLoad
     if (NULL == h)
     {
-        ErrorExitWF(L"LoadImageW(NULL, %ls[%ls], %u:%s, 0, 0, LR_SHARED)",
-                    lpszImageResource, lpszImageIdName, imageType, lpszImageTypeName);
+        Win32LastErrorFPrintFWAbort(stderr,                                                             // _In_ FILE          *lpStream
+                                    L"LoadImageW(NULL, %ls[%ls], %u:%s, 0, 0, LR_SHARED)",              // _In_ const wchar_t *lpMessageFormat
+                                    lpszImageResource, lpszImageIdName, imageType, lpszImageTypeName);  // ...
     }
     return h;
 }

@@ -1,5 +1,5 @@
 #include "win32_set_focus.h"
-#include "error_exit.h"
+#include "win32_last_error.h"
 
 // @Nullable
 HWND
@@ -20,8 +20,9 @@ Win32SetFocus(_In_opt_ HWND           hWnd,
         // Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/va-arg-va-copy-va-end-va-start?view=msvc-170
         va_list ap;
         va_start(ap, lpszErrorMsgFmt);
-        ErrorExitWFV(lpszErrorMsgFmt, ap);
-        va_end(ap);
+        Win32LastErrorFPrintFWVAbort(stderr,           // _In_  FILE          *lpStream
+                                     lpszErrorMsgFmt,  // _In_  const wchar_t *lpMessageFormat
+                                     ap);              // _In_  va_list        ap
     }
     return nullableHWndLostFocus;
 }

@@ -2,7 +2,7 @@
 #define H_CONFIG
 
 #include "wstr.h"
-#include "shortcut_key.h"
+#include "win32_shortcut_key.h"
 
 // TODO: Support comma separate list of hot keys?
 
@@ -21,7 +21,7 @@ struct ConfigEntryDynArr
 
 struct Config
 {
-    struct ShortcutKey       shortcutKey;
+    struct Win32ShortcutKey  shortcutKey;
     struct ConfigEntryDynArr dynArr;
 };
 

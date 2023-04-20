@@ -1,5 +1,5 @@
 #include "win32_hwnd.h"
-#include "error_exit.h"
+#include "win32_last_error.h"
 
 void
 Win32SetWindowLongPtrW(_In_ const HWND     hWnd,
@@ -21,7 +21,8 @@ Win32SetWindowLongPtrW(_In_ const HWND     hWnd,
         const DWORD dwLastError = GetLastError();
         if (0 != dwLastError)
         {   
-            ErrorExitW(lpDescription);
+            Win32LastErrorFPutWSAbort(stderr,          // _In_ FILE          *lpStream
+                                      lpDescription);  // _In_ const wchar_t *lpMessage
         }
     }
 }
@@ -43,7 +44,8 @@ Win32TryGetWindowLongPtrW(_In_ const HWND     hWnd,
         const DWORD dwLastError = GetLastError();
         if (0 != dwLastError)
         {
-            ErrorExitW(lpDescription);
+            Win32LastErrorFPutWSAbort(stderr,          // _In_ FILE          *lpStream
+                                      lpDescription);  // _In_ const wchar_t *lpMessage
         }
     }
     return (void *) x;
@@ -58,7 +60,9 @@ Win32GetWindowLongPtrW(_In_ const HWND     hWnd,
     void *x = Win32TryGetWindowLongPtrW(hWnd, nIndex, lpDescription);
     if (NULL == x)
     {
-        ErrorExitWF(L"NULL == %ls", lpDescription);
+        Win32LastErrorFPrintFWAbort(stderr,          // _In_ FILE          *lpStream
+                                    L"NULL == %ls",  // _In_ const wchar_t *lpMessageFormat
+                                    lpDescription);  // ...
     }
     return x;
 }

@@ -1,21 +1,21 @@
 #include "win32_console.h"
 #include "win32.h"
 #include "min_max.h"
-#include "error_exit.h"
+#include "win32_last_error.h"
 #include "log.h"
 #include <assert.h>
 #include <io.h>     // required for _open_osfhandle()
 #include <fcntl.h>  // required for _O_TEXT
 #include <stdio.h>  // required for _snwprintf_s() and _fdopen()
 
-static char *
-StaticGetStdHandleName(_In_ const DWORD nStdHandle)
+static wchar_t *
+StaticGetStdHandleNameW(_In_ const DWORD nStdHandle)
 {
     switch (nStdHandle)
     {
-        case STD_INPUT_HANDLE : return "STD_INPUT_HANDLE";
-        case STD_OUTPUT_HANDLE: return "STD_OUTPUT_HANDLE";
-        case STD_ERROR_HANDLE : return "STD_ERROR_HANDLE";
+        case STD_INPUT_HANDLE : return L"STD_INPUT_HANDLE";
+        case STD_OUTPUT_HANDLE: return L"STD_OUTPUT_HANDLE";
+        case STD_ERROR_HANDLE : return L"STD_ERROR_HANDLE";
         default:
         {
             assert(FALSE);
@@ -31,11 +31,15 @@ StaticGetStdHandle(_In_ const DWORD nStdHandle)
     const HANDLE h = GetStdHandle(nStdHandle);
     if (INVALID_HANDLE_VALUE == h)
     {
-        ErrorExitWF(L"INVALID_HANDLE_VALUE == GetStdHandle(%s)", StaticGetStdHandleName(nStdHandle));
+        Win32LastErrorFPrintFWAbort(stderr,                                        // _In_ FILE          *lpStream
+                                    L"INVALID_HANDLE_VALUE == GetStdHandle(%ls)",  // _In_ const wchar_t *lpMessageFormat
+                                    StaticGetStdHandleNameW(nStdHandle));          // _In_ ...
     }
     else if (NULL == h)
     {
-        ErrorExitWF(L"NULL == GetStdHandle(%s)", StaticGetStdHandleName(nStdHandle));
+        Win32LastErrorFPrintFWAbort(stderr,                                // _In_ FILE          *lpStream
+                                    L"NULL == GetStdHandle(%ls)",          // _In_ const wchar_t *lpMessageFormat
+                                    StaticGetStdHandleNameW(nStdHandle));  // _In_ ...
     }
     return h;
 }
@@ -78,14 +82,18 @@ StaticRedirect(_In_ const DWORD nStdHandle)
     const int fd = _open_osfhandle((intptr_t) hStd, _O_TEXT);
     if (-1 == fd)
     {
-        ErrorExitWF(L"-1 == _open_osfhandle(%s, _O_TEXT)", StaticGetStdHandleName(nStdHandle));
+        Win32LastErrorFPrintFWAbort(stderr,                                  // _In_ FILE          *lpStream
+                                    L"-1 == _open_osfhandle(%ls, _O_TEXT)",  // _In_ const wchar_t *lpMessageFormat
+                                    StaticGetStdHandleNameW(nStdHandle));    // _In_ ...
     }
 
     // Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/fdopen-wfdopen?view=msvc-170
     const FILE *fpStdNew = _fdopen(fd, mode);
     if (NULL == fpStdNew)
     {
-        ErrorExitWF(L"NULL == _fdopen(%s, \"w\")", StaticGetStdHandleName(nStdHandle));
+        Win32LastErrorFPrintFWAbort(stderr,                                // _In_ FILE          *lpStream
+                                    L"NULL == _fdopen(%ls, \"w\")",        // _In_ const wchar_t *lpMessageFormat
+                                    StaticGetStdHandleNameW(nStdHandle));  // _In_ ...
     }
 
     *fpStd = *fpStdNew;
@@ -96,7 +104,9 @@ StaticRedirect(_In_ const DWORD nStdHandle)
                      _IONBF,  // int mode
                      0))      // size_t size
     {
-        ErrorExitWF(L"0 != setvbuf(%s, ...)", StaticGetStdHandleName(nStdHandle));
+        Win32LastErrorFPrintFWAbort(stderr,                                // _In_ FILE          *lpStream
+                                    L"0 != setvbuf(%ls, ...)",             // _In_ const wchar_t *lpMessageFormat
+                                    StaticGetStdHandleNameW(nStdHandle));  // _In_ ...
     }
 }
 
@@ -123,7 +133,8 @@ Win32RedirectIOToConsole(const size_t ulMinConsoleLines,
             DEBUG_LOGWF(stderr, L"ERROR: AllocConsole() return non-TRUE result: %d (TRUE=%d, FALSE=%d)\r\n",
                         bAllocConsoleRef, TRUE, FALSE);
         #else
-            ErrorExitW(L"AllocConsole()");
+            Win32LastErrorFPutWSAbort(stderr,              // _In_ FILE          *lpStream
+                                      L"AllocConsole()");  // _In_ const wchar_t *lpMessage
         #endif  // __WINE__
     }
 
@@ -133,7 +144,8 @@ Win32RedirectIOToConsole(const size_t ulMinConsoleLines,
     CONSOLE_SCREEN_BUFFER_INFO coninfo = {};
     if (!GetConsoleScreenBufferInfo(hStdout, &coninfo))
     {
-        ErrorExitW(L"GetConsoleScreenBufferInfo(hStdout, &CONSOLE_SCREEN_BUFFER_INFO)");
+        Win32LastErrorFPutWSAbort(stderr,                                                                // _In_ FILE          *lpStream
+                                  L"GetConsoleScreenBufferInfo(hStdout, &CONSOLE_SCREEN_BUFFER_INFO)");  // _In_ const wchar_t *lpMessage
     }
 
     const SHORT sConsoleLines = MinShort(sMaxConsoleLines,
@@ -145,7 +157,8 @@ Win32RedirectIOToConsole(const size_t ulMinConsoleLines,
         const COORD dwSize = {.X = coninfo.dwSize.X, .Y = sConsoleLines};
         if (!SetConsoleScreenBufferSize(hStdout, dwSize))
         {
-            ErrorExitW(L"SetConsoleScreenBufferSize(hStdout, &coninfo)");
+            Win32LastErrorFPutWSAbort(stderr,                                             // _In_ FILE          *lpStream
+                                      L"SetConsoleScreenBufferSize(hStdout, &coninfo)");  // _In_ const wchar_t *lpMessage
         }
     }
 

@@ -1,5 +1,5 @@
 #include "win32_size_grip_control.h"
-#include "error_exit.h"
+#include "win32_last_error.h"
 #include "log.h"
 #include "win32_dpi.h"
 #include "win32_hwnd.h"
@@ -9,7 +9,7 @@
 // extern
 const UINT8    WIN32_SIZE_GRIP_CONTROL_WIDTH_AND_HEIGHT = 17;
 // extern
-const wchar_t *WIN32_SIZE_GRIP_CONTROL_CLASS_NAMEW      = L"SIZE_GRIP_CONTROL";
+const wchar_t *WIN32_SIZE_GRIP_CONTROL_CLASS_NAMEW      = L"WIN32_SIZE_GRIP_CONTROL";
 
 static struct Global
 {
@@ -51,11 +51,10 @@ Win32SizeGripControlWindowProc_WM_NCCREATE(_In_ const HWND   hWnd,
         .hWnd           = hWnd,
         .bIsDpiChanging = FALSE,
     };
-    lpWin->dpi = WIN32_DPI_INIT;
     Win32DPIGet(&lpWin->dpi, hWnd);
 
     Win32SetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX, lpWin,
-                          L"Win32SizeGripControlWindowProc_WM_NCCREATE: SetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX, lpWin)");
+                           L"Win32SizeGripControlWindowProc_WM_NCCREATE: SetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX, lpWin)");
 }
 
 // Ref: https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-create
@@ -66,20 +65,22 @@ Win32SizeGripControlWindowProc_WM_CREATE(_In_ const HWND   hWnd,
                                          _In_ const LPARAM lParam)
 {
     struct Window *lpWin = Win32GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX,
-                                                 L"Win32SizeGripControlWindowProc_WM_CREATE: GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX)");
+                                                  L"Win32SizeGripControlWindowProc_WM_CREATE: GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX)");
     // Ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-createstructw
     lpWin->createStruct = *(CREATESTRUCTW *) lParam;
     if (NULL == lpWin->createStruct.lpCreateParams)
     {
-        ErrorExitW(L"Win32SizeGripControl: WM_CREATE: CREATESTRUCTW.lpCreateParams is NULL: Expected struct Win32SizeGripControlCreateParams");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControlWindowProc_WM_CREATE: CREATESTRUCTW.lpCreateParams is NULL: Expected struct Win32SizeGripControlCreateParams");  // _In_ const wchar_t *lpMessage
     }
 
     lpWin->createParams = *(struct Win32SizeGripControlCreateParams *) lpWin->createStruct.lpCreateParams;
 
     if (WIN32_SGC_BOTTOM_LEFT != lpWin->createParams.orientation && WIN32_SGC_BOTTOM_RIGHT != lpWin->createParams.orientation)
     {
-        ErrorExitWF(L"Win32SizeGripControlCreateParams.orientation: Expected WIN32_SGC_BOTTOM_LEFT:%d or WIN32_SGC_BOTTOM_RIGHT:%d, but found: %d",
-                    WIN32_SGC_BOTTOM_LEFT, WIN32_SGC_BOTTOM_RIGHT, lpWin->createParams.orientation);
+        Win32LastErrorFPrintFWAbort(stderr,                                                                           // _In_ FILE          *lpStream
+                                    L"Win32SizeGripControlCreateParams.orientation: Expected WIN32_SGC_BOTTOM_LEFT:%d or WIN32_SGC_BOTTOM_RIGHT:%d, but found: %d",                                  // _In_ const wchar_t *lpMessageFormat
+                                    WIN32_SGC_BOTTOM_LEFT, WIN32_SGC_BOTTOM_RIGHT, lpWin->createParams.orientation);  // _In_ ...
     }
 
     const wchar_t *lpCursorName = (WIN32_SGC_BOTTOM_LEFT == lpWin->createParams.orientation) ? IDC_SIZENESW : IDC_SIZENWSE;
@@ -96,7 +97,8 @@ Win32SizeGripControlWindowProc_WM_CREATE(_In_ const HWND   hWnd,
 
     if (NULL == lpWin->hCursorActive)
     {
-        ErrorExitW(L"Win32SizeGripControlWindowProc_WM_NCCREATE: LoadCursorW(NULL, IDC_SIZENWSE)");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControlWindowProc_WM_NCCREATE: LoadCursorW(NULL, IDC_SIZENWSE)");  // _In_ const wchar_t *lpMessage
     }
 }
 
@@ -109,7 +111,7 @@ Win32SizeGripControlWindowProc_WM_PAINT(_In_ const HWND   hWnd,
                                         _In_ const LPARAM lParam)
 {
     struct Window *lpWin = Win32GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX,
-                                                 L"Win32SizeGripControlWindowProc_WM_PAINT: GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX)");
+                                                  L"Win32SizeGripControlWindowProc_WM_PAINT: GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX)");
 
     // Ref: https://www.codeproject.com/Articles/617212/Custom-Controls-in-Win-API-The-Painting
     // Ref: https://learn.microsoft.com/en-us/windows/win32/gdi/painting-and-drawing-messages
@@ -123,7 +125,8 @@ Win32SizeGripControlWindowProc_WM_PAINT(_In_ const HWND   hWnd,
                                &ps);  // [out] LPPAINTSTRUCT lpPaint
     if (NULL == hDC)
     {
-        ErrorExitW(L"Win32SizeGripControlWindowProc_WM_PAINT: BeginPaint(hWnd, &ps)");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControlWindowProc_WM_PAINT: BeginPaint(hWnd, &ps)");  // _In_ const wchar_t *lpMessage
     }
 
     // Ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getclientrect
@@ -131,7 +134,8 @@ Win32SizeGripControlWindowProc_WM_PAINT(_In_ const HWND   hWnd,
     if (0 == GetClientRect(hWnd,    // [in]  HWND   hWnd,
                            &rect))  // [out] LPRECT lpRect
     {
-        ErrorExitW(L"Win32SizeGripControlWindowProc_WM_PAINT: GetClientRect(hWnd, &rect)");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControlWindowProc_WM_PAINT: GetClientRect(hWnd, &rect)");  // _In_ const wchar_t *lpMessage
     }
 
     const LONG width  = rect.right - rect.left;
@@ -142,7 +146,8 @@ Win32SizeGripControlWindowProc_WM_PAINT(_In_ const HWND   hWnd,
     const HDC hDCMem = CreateCompatibleDC(ps.hdc);  // [in] HDC hdc
     if (NULL == hDCMem)
     {
-        ErrorExitW(L"Win32SizeGripControlWindowProc_WM_PAINT: CreateCompatibleDC(...)");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControlWindowProc_WM_PAINT: CreateCompatibleDC(...)");  // _In_ const wchar_t *lpMessage
     }
 
     // Ref: https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-createcompatiblebitmap
@@ -151,7 +156,8 @@ Win32SizeGripControlWindowProc_WM_PAINT(_In_ const HWND   hWnd,
                                              height);    // [in] int cy
     if (NULL == hBitmap)
     {
-        ErrorExitW(L"Win32SizeGripControlWindowProc_WM_PAINT: CreateCompatibleBitmap(...)");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControlWindowProc_WM_PAINT: CreateCompatibleBitmap(...)");  // _In_ const wchar_t *lpMessage
     }
 
     // Ref: https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-selectobject
@@ -159,16 +165,18 @@ Win32SizeGripControlWindowProc_WM_PAINT(_In_ const HWND   hWnd,
                                              hBitmap);  // [in] HGDIOBJ h
     if (NULL == hBitmapPrev)
     {
-        ErrorExitW(L"Win32SizeGripControlWindowProc_WM_PAINT: SelectObject(hDCMem, hBitmap)");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControlWindowProc_WM_PAINT: SelectObject(hDCMem, hBitmap)");  // _In_ const wchar_t *lpMessage
     }
 
     // Ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-fillrect
-    if (0 == FillRect(hDCMem,                     // [in] HDC        hDC
-//                      &lpPs->rcPaint,                // [in] const RECT *lprc
-                      &rect,                         // [in] const RECT *lprc
+    if (0 == FillRect(hDCMem,                             // [in] HDC        hDC
+//                      &lpPs->rcPaint,                     // [in] const RECT *lprc
+                      &rect,                              // [in] const RECT *lprc
                       global.wndClassExW.hbrBackground))  // [in] HBRUSH     hbr
     {
-        ErrorExitW(L"Win32SizeGripControlWindowProc_WM_PAINT: FillRect(hDCMem, &rect, global.wndClassExW.hbrBackground)");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControlWindowProc_WM_PAINT: FillRect(hDCMem, &rect, global.wndClassExW.hbrBackground)");  // _In_ const wchar_t *lpMessage
     }
 
     // WIN32_SGC_BOTTOM_LEFT
@@ -219,11 +227,12 @@ Win32SizeGripControlWindowProc_WM_PAINT(_In_ const HWND   hWnd,
                             .bottom = lTop  + squareLen,
                             .right  = lLeft + squareLen,};
 
-            if (0 == FillRect(hDCMem,                              // [in] HDC        hDC
+            if (0 == FillRect(hDCMem,                              // [in] HDC         hDC
                               &r,                                  // [in] const RECT *lprc
-                              (HBRUSH) (1 + COLOR_BTNHIGHLIGHT)))  // [in] HBRUSH     hbr
+                              (HBRUSH) (1 + COLOR_BTNHIGHLIGHT)))  // [in] HBRUSH      hbr
             {
-                ErrorExitW(L"Win32SizeGripControlWindowProc_WM_PAINT: FillRect(hDCMem, &r, (HBRUSH) (1 + COLOR_BTNHIGHLIGHT))");
+                Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                          L"Win32SizeGripControlWindowProc_WM_PAINT: FillRect(hDCMem, &r, (HBRUSH) (1 + COLOR_BTNHIGHLIGHT))");  // _In_ const wchar_t *lpMessage
             }
 
             const RECT r2 = {.top    = lTop,
@@ -231,11 +240,12 @@ Win32SizeGripControlWindowProc_WM_PAINT(_In_ const HWND   hWnd,
                              .bottom = lTop  + innerSquareLen,
                              .right  = lLeft + innerSquareLen,};
 
-            if (0 == FillRect(hDCMem,                           // [in] HDC        hDC
+            if (0 == FillRect(hDCMem,                           // [in] HDC         hDC
                               &r2,                              // [in] const RECT *lprc
-                              (HBRUSH) (1 + COLOR_BTNSHADOW)))  // [in] HBRUSH     hbr
+                              (HBRUSH) (1 + COLOR_BTNSHADOW)))  // [in] HBRUSH      hbr
             {
-                ErrorExitW(L"Win32SizeGripControlWindowProc_WM_PAINT: FillRect(hDCMem, &r2, (HBRUSH) (1 + COLOR_BTNSHADOW))");
+                Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                          L"Win32SizeGripControlWindowProc_WM_PAINT: FillRect(hDCMem, &r2, (HBRUSH) (1 + COLOR_BTNSHADOW))");  // _In_ const wchar_t *lpMessage
             }
             __attribute__((unused)) int dummy = 1;
         }
@@ -253,32 +263,37 @@ Win32SizeGripControlWindowProc_WM_PAINT(_In_ const HWND   hWnd,
                     0,  // [in] int   y1
                     SRCCOPY))  //  [in] DWORD rop
     {
-        ErrorExitW(L"Win32SizeGripControlWindowProc_WM_PAINT: BitBlt(...)");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControlWindowProc_WM_PAINT: BitBlt(...)");  // _In_ const wchar_t *lpMessage
     }
 
     if (NULL == SelectObject(hDCMem,        // [in] HDC     hdc
                              hBitmapPrev))  // [in] HGDIOBJ h
     {
-        ErrorExitW(L"Win32SizeGripControlWindowProc_WM_PAINT: SelectObject(hDCMem, hBitmapPrev)");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControlWindowProc_WM_PAINT: SelectObject(hDCMem, hBitmapPrev)");  // _In_ const wchar_t *lpMessage
     }
 
     // Ref: https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-deleteobject
     if (FALSE == DeleteObject(hBitmap))  // [in] HGDIOBJ ho
     {
-        ErrorExitW(L"Win32SizeGripControlWindowProc_WM_PAINT: DeleteObject(hBitmap)");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControlWindowProc_WM_PAINT: DeleteObject(hBitmap)");  // _In_ const wchar_t *lpMessage
     }
 
     // Ref: https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-deletedc
     if (FALSE == DeleteDC(hDCMem))  // [in] HDC hdc
     {
-        ErrorExitW(L"Win32SizeGripControlWindowProc_WM_PAINT: DeleteDC(hDCMem)");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControlWindowProc_WM_PAINT: DeleteDC(hDCMem)");  // _In_ const wchar_t *lpMessage
     }
 
     // Ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-endpaint
     if (!EndPaint(hWnd,  // [in] HWND               hWnd
                   &ps))  // [in] const PAINTSTRUCT *lpPaint
     {
-        ErrorExitW(L"Win32SizeGripControlWindowProc_WM_PAINT: EndPaint(hWnd, &ps)");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControlWindowProc_WM_PAINT: EndPaint(hWnd, &ps)");  // _In_ const wchar_t *lpMessage
     }
 }
 
@@ -291,7 +306,7 @@ Win32SizeGripControlWindowProc_WM_DPICHANGED(_In_ const HWND   hWnd,
                                              _In_ const LPARAM lParam)
 {
     struct Window *lpWin = Win32GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX,
-                                                 L"Win32SizeGripControlWindowProc_WM_DPICHANGED: GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX)");
+                                                  L"Win32SizeGripControlWindowProc_WM_DPICHANGED: GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX)");
     Win32DPIGet(&lpWin->dpi, hWnd);
 }
 
@@ -304,7 +319,7 @@ Win32SizeGripControlWindowProc_WM_DPICHANGED_BEFOREPARENT(_In_ const HWND   hWnd
                                                           _In_ const LPARAM lParam)
 {
     struct Window *lpWin = Win32GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX,
-                                                 L"Win32SizeGripControlWindowProc_WM_DPICHANGED_BEFOREPARENT: GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX)");
+                                                  L"Win32SizeGripControlWindowProc_WM_DPICHANGED_BEFOREPARENT: GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX)");
     Win32DPIGet(&lpWin->dpi, hWnd);
     lpWin->bIsDpiChanging = TRUE;
 }
@@ -318,7 +333,7 @@ Win32SizeGripControlWindowProc_WM_DPICHANGED_AFTERPARENT(_In_ const HWND   hWnd,
                                                           _In_ const LPARAM lParam)
 {
     struct Window *lpWin = Win32GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX,
-                                                 L"Win32SizeGripControlWindowProc_WM_DPICHANGED_AFTERPARENT: GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX)");
+                                                  L"Win32SizeGripControlWindowProc_WM_DPICHANGED_AFTERPARENT: GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX)");
     lpWin->bIsDpiChanging = FALSE;
 }
 
@@ -331,7 +346,7 @@ Win32SizeGripControlWindowProc_WM_LBUTTONDOWN(_In_ const HWND   hWnd,
                                               _In_ const LPARAM lParam)
 {
     struct Window *lpWin = Win32GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX,
-                                                 L"Win32SizeGripControlWindowProc_WM_LBUTTONDOWN: GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX)");
+                                                  L"Win32SizeGripControlWindowProc_WM_LBUTTONDOWN: GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX)");
 //    DEBUG_LOGWF(stdout, L"Win32SizeGripControlWindowProc_WM_LBUTTONDOWN: B: lpWin->prevLeftMouseButtonDownPoint: x: %ld, y: %ld\r\n", lpWin->prevLeftMouseButtonDownPoint.x, lpWin->prevLeftMouseButtonDownPoint.y);
     lpWin->prevLeftMouseButtonDownPoint = (POINT) { .x = GET_X_LPARAM(lParam), .y = GET_Y_LPARAM(lParam) };
 //    DEBUG_LOGWF(stdout, L"Win32SizeGripControlWindowProc_WM_LBUTTONDOWN: A: lpWin->prevLeftMouseButtonDownPoint: x: %ld, y: %ld\r\n", lpWin->prevLeftMouseButtonDownPoint.x, lpWin->prevLeftMouseButtonDownPoint.y);
@@ -362,7 +377,8 @@ GetTopLevelWindow(_In_ const HWND hWnd)
                                         GA_PARENT);  // [in] UINT gaFlags
     if (NULL == hWndParent)
     {
-        ErrorExitW(L"Win32SizeGripControl: GetAncestor(hWnd, GA_PARENT)");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControl: GetAncestor(hWnd, GA_PARENT)");  // _In_ const wchar_t *lpMessage
     }
 //    DEBUG_LOGWF(stdout, L"Win32SizeGripControl: GetAncestor(hWnd, GA_PARENT): %p\r\n", hWndParent);
     return hWndParent;
@@ -376,7 +392,7 @@ Win32SizeGripControlWindowProc_WM_MOUSEMOVE(_In_ const HWND   hWnd,
                                             _In_ const LPARAM lParam)
 {
     struct Window *lpWin = Win32GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX,
-                                                 L"Win32SizeGripControlWindowProc_WM_MOUSEMOVE: GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX)");
+                                                  L"Win32SizeGripControlWindowProc_WM_MOUSEMOVE: GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX)");
     if (!(wParam & MK_LBUTTON))
     {
         return;
@@ -397,7 +413,8 @@ Win32SizeGripControlWindowProc_WM_MOUSEMOVE(_In_ const HWND   hWnd,
                                           GA_PARENT);  // [in] UINT gaFlags
     if (NULL == hWndTopLevel)
     {
-        ErrorExitW(L"Win32SizeGripControlWindowProc_WM_MOUSEMOVE: GetAncestor(hWnd, GA_PARENT)");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControlWindowProc_WM_MOUSEMOVE: GetAncestor(hWnd, GA_PARENT)");  // _In_ const wchar_t *lpMessage
     }
 
     // Ref: https://learn.microsoft.com/en-us/windows/win32/api/errhandlingapi/nf-errhandlingapi-setlasterror
@@ -410,7 +427,8 @@ Win32SizeGripControlWindowProc_WM_MOUSEMOVE(_In_ const HWND   hWnd,
                              1)             // [in]      UINT    cPoints
         && 0 != GetLastError())
     {
-        ErrorExitW(L"Win32SizeGripControlWindowProc_WM_MOUSEMOVE: MapWindowPoints");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControlWindowProc_WM_MOUSEMOVE: MapWindowPoints");  // _In_ const wchar_t *lpMessage
     }
 
     RECT winRect = {0};
@@ -418,7 +436,8 @@ Win32SizeGripControlWindowProc_WM_MOUSEMOVE(_In_ const HWND   hWnd,
     if (0 == GetWindowRect(hWndTopLevel,  // [in]  HWND   hWnd
                            &winRect))     // [out] LPRECT lpRect
     {
-        ErrorExitW(L"Win32SizeGripControlWindowProc_WM_MOUSEMOVE: GetWindowRect(hWndTopLevel, &winRect)");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControlWindowProc_WM_MOUSEMOVE: GetWindowRect(hWndTopLevel, &winRect)");  // _In_ const wchar_t *lpMessage
     }
     DEBUG_LOGWF(stdout, L"Win31SizeGripControlWindowProc_WM_MOUSEMOVE: B: hWndTopLevel: %p, x: %ld, y: %ld, width: %ld, height: %ld, p.x: %ld->%ld, p.y: %ld->%ld, dw: %ld, dh: %ld\r\n",
                 hWndTopLevel, winRect.left, winRect.top, winRect.right - winRect.left, winRect.bottom - winRect.top, p.x, p2.x, p.y, p2.y, widthDelta, heightDelta);
@@ -436,7 +455,8 @@ Win32SizeGripControlWindowProc_WM_MOUSEMOVE(_In_ const HWND   hWnd,
                       winRect.bottom - winRect.top + heightDelta,  // [in]           int  cy
                       SWP_NOACTIVATE | SWP_NOZORDER))              // [in]           UINT uFlags
     {
-        ErrorExitW(L"Win32SizeGripControlWindowProc_WM_MOUSEMOVE: SetWindowPos(hWndTopLevel, ...)");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControlWindowProc_WM_MOUSEMOVE: SetWindowPos(hWndTopLevel, ...)");  // _In_ const wchar_t *lpMessage
     }                                                                                                                                                                       
 
     RECT winRect2 = {0};
@@ -444,7 +464,8 @@ Win32SizeGripControlWindowProc_WM_MOUSEMOVE(_In_ const HWND   hWnd,
     if (0 == GetWindowRect(hWndTopLevel,  // [in]  HWND   hWnd
                            &winRect2))    // [out] LPRECT lpRect
     {
-        ErrorExitW(L"Win32SizeGripControlWindowProc_WM_MOUSEMOVE: GetWindowRect(hWndTopLevel, &winRect2)");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControlWindowProc_WM_MOUSEMOVE: GetWindowRect(hWndTopLevel, &winRect2)");  // _In_ const wchar_t *lpMessage
     }
     DEBUG_LOGWF(stdout, L"Win32SizeGripControlWindowProc_WM_MOUSEMOVE: A: hWndTopLevel: %p, x: %ld, y: %ld, width: %ld, height: %ld\r\n",
                 hWndTopLevel, winRect2.left, winRect2.top, winRect2.right - winRect2.left, winRect2.bottom - winRect2.top);
@@ -462,7 +483,7 @@ Win32SizeGripControlWindowProc_WM_LBUTTONUP(_In_ const HWND   hWnd,
 {
     __attribute__((unused))
     struct Window *lpWin = Win32GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX,
-                                                 L"Win32SizeGripControlWindowProc_WM_LBUTTONUP: GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX)");
+                                                  L"Win32SizeGripControlWindowProc_WM_LBUTTONUP: GetWindowLongPtrW(hWnd, WINDOW_LONG_PTR_INDEX)");
 }
 
 // Ref: https://learn.microsoft.com/en-us/windows/win32/menurc/wm-setcursor
@@ -481,7 +502,8 @@ Win32SizeGripControlWindowProc_WM_SETCURSOR(_In_ const HWND   hWnd,
     POINT p = {0};
     if (FALSE == GetCursorPos(&p))  // [out] LPPOINT lpPoint
     {
-        ErrorExitW(L"Win32SizeGripControlWindowProc_WM_SETCURSOR: GetCursorPos");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControlWindowProc_WM_SETCURSOR: GetCursorPos");  // _In_ const wchar_t *lpMessage
     }
 
     SetLastError(0);
@@ -491,7 +513,8 @@ Win32SizeGripControlWindowProc_WM_SETCURSOR(_In_ const HWND   hWnd,
                              1)             // [in]      UINT    cPoints
         && 0 != GetLastError())
     {
-        ErrorExitW(L"Win32SizeGripControlWindowProc_WM_SETCURSOR: MapWindowPoints");
+        Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControlWindowProc_WM_SETCURSOR: MapWindowPoints");  // _In_ const wchar_t *lpMessage
     }
 
     BOOL isActiveCursor = FALSE;
@@ -508,7 +531,8 @@ DEBUG_LOGWF(stdout, L"Win32SizeGripControlWindowProc_WM_SETCURSOR: WIN32_SGC_BOT
         if (0 == GetClientRect(hWnd,    // [in]  HWND   hWnd,
                                &rect))  // [out] LPRECT lpRect
         {
-            ErrorExitW(L"Win32SizeGripControlWindowProc_WM_SETCURSOR: WIN32_SGC_BOTTOM_RIGHT: GetClientRect(hWnd, &rect)");
+            Win32LastErrorFPutWSAbort(stderr,  // _In_ FILE          *lpStream
+                                      L"Win32SizeGripControlWindowProc_WM_SETCURSOR: WIN32_SGC_BOTTOM_RIGHT: GetClientRect(hWnd, &rect)");  // _In_ const wchar_t *lpMessage
         }
 
         const LONG height = rect.bottom - rect.top;
@@ -642,7 +666,7 @@ Win32SizeGripControlInit(_In_ const HINSTANCE hInstance)
         .cbClsExtra = (int) 0,
         // "The number of extra bytes to allocate following the window instance. The system initializes the bytes to zero."
         // Ref: https://stackoverflow.com/a/65876605/257299
-        .cbWndExtra = (int) 1 * sizeof(void *),
+        .cbWndExtra = (int) (1 + WINDOW_LONG_PTR_INDEX) * sizeof(void *),
         // "A handle to the instance that contains the window procedure for the class."
         // Ref: https://stackoverflow.com/questions/20140117/why-does-createwindow-take-a-hinstance-as-an-argument-if-was-already-provided
         // Ref: https://devblogs.microsoft.com/oldnewthing/20050418-59/?p=35873
@@ -676,7 +700,8 @@ Win32SizeGripControlInit(_In_ const HINSTANCE hInstance)
     const ATOM registerClassExAtom = RegisterClassExW(&global.wndClassExW);
     if (0 == registerClassExAtom)
     {
-        ErrorExitW(L"Win32SizeGripControl: RegisterClassW");
+        Win32LastErrorFPutWSAbort(stderr,                                    // _In_ FILE          *lpStream
+                                  L"Win32SizeGripControl: RegisterClassW");  // _In_ const wchar_t *lpMessage
     }
 }
 

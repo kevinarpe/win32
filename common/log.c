@@ -40,9 +40,9 @@ LogPrefix(FILE *fp)
 }
 
 void
-LogW(FILE          *fp,
+LogW(_In_ FILE          *fp,
      // @EmptyStringAllowed
-     const wchar_t *lpszMsg)
+     _In_ const wchar_t *lpszMsg)
 {
     assert(NULL != fp);
     assert(NULL != lpszMsg);
@@ -53,9 +53,10 @@ LogW(FILE          *fp,
 }
 
 void
-LogWF(FILE          *fp,
+LogWF(_In_ FILE          *fp,
       // @EmptyStringAllowed
-      const wchar_t *lpszMsgFmt, ...)
+      _In_ const wchar_t *lpszMsgFmt,
+      _In_ ...)
 {
     assert(NULL != fp);
     assert(NULL != lpszMsgFmt);
@@ -71,10 +72,10 @@ LogWF(FILE          *fp,
 }
 
 void
-LogWFV(FILE          *fp,
+LogWFV(_In_ FILE          *fp,
        // @EmptyStringAllowed
-       const wchar_t *lpszMsgFmt,
-       va_list        ap)
+       _In_ const wchar_t *lpszMsgFmt,
+       _In_ va_list        ap)
 {
     assert(NULL != fp);
     assert(NULL != lpszMsgFmt);

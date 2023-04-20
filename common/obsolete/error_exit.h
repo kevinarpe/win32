@@ -1,14 +1,11 @@
 #ifndef H_COMMON_ERROR_EXIT
 #define H_COMMON_ERROR_EXIT
 
-#include <sal.h>    // required for _In_
-#include <wchar.h>  // required for wchar_t
+#include <sal.h>      // required for _In_
+#include <wchar.h>    // required for wchar_t
+#include <stdbool.h>  // required for bool
 
-/*
-void ErrorExit(_In_ const char *lpszMsg);
-
-void ErrorExitF(_In_ const char *lpszMsgFmt, ...);
-*/
+// TODO: Deprecate me!
 
 /**
  * Ex: "2023-01-31 00:51:45.064 +09:00 ERROR: My error message: Failed with error 1234: Blah, blah, blah"

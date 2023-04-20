@@ -23,7 +23,14 @@ BASHLIB_ARG_RELEASE='--release'
 BASHLIB_ARG_COMMON='--common'
 
 __BASHLIB_GCC='x86_64-w64-mingw32-gcc'
-__BASHLIB_STRIP='x86_64-w64-mingw32-strip'
+# Ex: "Linux" or "MINGW64_NT-10.0-19042"
+__BASHLIB_UNAME_KERNEL="$(uname --kernel-name)"
+
+case "$__BASHLIB_UNAME_KERNEL" in
+    Linux*) __BASHLIB_STRIP='x86_64-w64-mingw32-strip' ;;
+    MINGW*) __BASHLIB_STRIP='strip' ;;
+    *     ) printf -- 'Internal error: Unknown kernel name: [%s]\n' "$__BASHLIB_UNAME_KERNEL"; exit 1 ;;
+esac
 
 __bashlib_is_linux()
 {

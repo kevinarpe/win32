@@ -1,0 +1,1 @@
+Remove WIN32_DPI_INIT

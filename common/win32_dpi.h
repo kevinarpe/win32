@@ -20,14 +20,17 @@ struct Win32DPI
     UINT          dpi;
 };
 
-#define WIN32_DPI_UNSET -1
+#define WIN32_DPI_UNSET 0
+
+#define WIN32_DPI_IS_UNSET(/* struct Win32DPI */ dpi) \
+    (WIN32_DPI_UNSET == (dpi).dpi)
 
 // Ex: struct DPI dpi = WIN32_DPI_INIT;
 #define WIN32_DPI_INIT \
     ((struct Win32DPI) {                       \
         .dpiAwareness = DPI_AWARENESS_INVALID, \
-        .dpi = -1,                             \
-    });
+        .dpi          = WIN32_DPI_UNSET,       \
+    })
 
 /**
  * @param lpDpi

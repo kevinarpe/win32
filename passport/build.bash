@@ -87,7 +87,7 @@ main()
     done
 
     bashlib_log_and_run_gcc_cmd \
-        $is_release -o "$EXECUTABLE" "$COMMON_DIR_PATH"/*.o *.o -lgdi32 -lcomctl32
+        $is_release -o "$EXECUTABLE" "$COMMON_DIR_PATH"/*.o *.o -lgdi32 -lcomctl32 -lole32
 
     bashlib_log_and_run_cmd \
         ls -l "$EXECUTABLE"

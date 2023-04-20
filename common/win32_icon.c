@@ -1,5 +1,5 @@
 #include "win32_icon.h"
-#include "error_exit.h"
+#include "win32_last_error.h"
 #include <assert.h>
 
 void
@@ -28,7 +28,8 @@ Win32IconGetDimensions(_In_  const HICON                 hIcon,
     ICONINFO ii = {};
     if (!GetIconInfo(hIcon, &ii))
     {
-        ErrorExitW(L"GetIconInfo(hIcon, &ii)");
+        Win32LastErrorFPutWSAbort(stderr,                       // _In_ FILE          *lpStream
+                                  L"GetIconInfo(hIcon, &ii)");  // _In_ const wchar_t *lpMessage
     }
 
     // Ref: https://docs.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-bitmap
@@ -37,7 +38,8 @@ Win32IconGetDimensions(_In_  const HICON                 hIcon,
     const int bmSize = GetObject(ii.hbmMask, sizeof(bm), &bm);
     if (0 == bmSize)
     {
-        ErrorExitW(L"GetObject(ii.hbmMask, sizeof(bm), &bm)");
+        Win32LastErrorFPutWSAbort(stderr,                                      // _In_ FILE          *lpStream
+                                  L"GetObject(ii.hbmMask, sizeof(bm), &bm)");  // _In_ const wchar_t *lpMessage
     }
 
     const LONG width = bm.bmWidth;
@@ -50,7 +52,8 @@ Win32IconGetDimensions(_In_  const HICON                 hIcon,
     {
         if (!DeleteObject(ii.hbmMask))
         {
-            ErrorExitW(L"DeleteObject(ii.hbmMask)");
+            Win32LastErrorFPutWSAbort(stderr,                        // _In_ FILE          *lpStream
+                                      L"DeleteObject(ii.hbmMask)");  // _In_ const wchar_t *lpMessage
         }
     }
 
@@ -58,7 +61,8 @@ Win32IconGetDimensions(_In_  const HICON                 hIcon,
     {
         if (!DeleteObject(ii.hbmColor))
         {
-            ErrorExitW(L"DeleteObject(ii.hbmColor)");
+            Win32LastErrorFPutWSAbort(stderr,                         // _In_ FILE          *lpStream
+                                      L"DeleteObject(ii.hbmColor)");  // _In_ const wchar_t *lpMessage
         }
     }
 

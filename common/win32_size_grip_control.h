@@ -6,7 +6,7 @@
 
 // Assumes 100% 96 DPI: 1px margin, plus 5x 2px squares
 extern const UINT8    WIN32_SIZE_GRIP_CONTROL_WIDTH_AND_HEIGHT;  // = 17;
-extern const wchar_t *WIN32_SIZE_GRIP_CONTROL_CLASS_NAMEW;       // = L"SIZE_GRIP_CONTROL";
+extern const wchar_t *WIN32_SIZE_GRIP_CONTROL_CLASS_NAMEW;       // = L"WIN32_SIZE_GRIP_CONTROL";
 
 enum EWin32SizeGripControlOrientation
 {
