@@ -1,6 +1,7 @@
 #include "win32_text.h"
 #include "win32_last_error.h"
-#include <assert.h>
+#include <assert.h>  // required for assert
+#include <stdlib.h>  // required for assert on MinGW
 
 // Digits plus English alphabet twice is 10 + (2 x 26) = 62 chars
 // extern

@@ -1,6 +1,7 @@
 #include "win32_font.h"
 #include "win32_last_error.h"
-#include <assert.h>
+#include <assert.h>  // required for assert
+#include <stdlib.h>  // required for assert on MinGW
 
 static struct Win32FontGetMessageBoxFont cachedFont = {
     .nonClientMetricsW = { .cbSize = sizeof(NONCLIENTMETRICSW) },

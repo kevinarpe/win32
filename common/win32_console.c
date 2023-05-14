@@ -3,7 +3,8 @@
 #include "min_max.h"
 #include "win32_last_error.h"
 #include "log.h"
-#include <assert.h>
+#include <assert.h>  // required for assert
+#include <stdlib.h>  // required for assert on MinGW
 #include <io.h>     // required for _open_osfhandle()
 #include <fcntl.h>  // required for _O_TEXT
 #include <stdio.h>  // required for _snwprintf_s() and _fdopen()

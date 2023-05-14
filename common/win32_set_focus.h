@@ -4,8 +4,9 @@
 #include "win32.h"
 
 /**
- * @param hWnd
+ * @param hNullableWnd
  *        window (widget) handle to set focus
+ *        if NULL, no windows will be in focus and all keystrokes are ignored
  *
  * @param lpszErrorMsgFmt
  *        printf-style format string when set focus fails
@@ -20,8 +21,9 @@
  */
 // @Nullable
 HWND
-Win32SetFocus(_In_opt_ HWND           hWnd,
-              _In_     const wchar_t *lpszErrorMsgFmt, ...);
+Win32SetFocus(_In_opt_ HWND           hNullableWnd,
+              _In_     const wchar_t *lpszErrorMsgFmt,
+              _In_     ...);
 
 #endif  // H_COMMON_WIN32_SET_FOCUS
 

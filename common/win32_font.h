@@ -6,7 +6,7 @@
 struct Win32FontGetMessageBoxFont
 {
     NONCLIENTMETRICSW nonClientMetricsW;
-    HFONT hFont;
+    HFONT             hFont;
 };
 
 void

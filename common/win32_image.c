@@ -1,5 +1,8 @@
 #include "win32_image.h"
 #include "win32_last_error.h"
+#include "assertive.h"
+#include <assert.h>  // required for assert
+#include <stdlib.h>  // required for assert on MinGW
 
 HANDLE
 Win32LoadSharedImageByResource(_In_ const wchar_t *lpszImageResource,  // Ex: IDI_APPLICATION
@@ -7,6 +10,12 @@ Win32LoadSharedImageByResource(_In_ const wchar_t *lpszImageResource,  // Ex: ID
                                _In_ const UINT     imageType,          // Ex: IMAGE_ICON
                                _In_ const char    *lpszImageTypeName)  // Ex: "IMAGE_ICON"
 {
+    assert(NULL != lpszImageResource);
+    assert(NULL != lpszImageIdName);
+    AssertWF((IMAGE_BITMAP /*0*/ == imageType || IMAGE_ICON /*1*/ == imageType || IMAGE_CURSOR /*2*/ == imageType),  // _In_ const bool     bAssertResult,
+             L"imageType:%d is not any of: IMAGE_BITMAP:%d, IMAGE_ICON:%d, IMAGE_CURSOR:%d",                         // _In_ const wchar_t *lpMessageFormatWCharArr,
+             imageType, IMAGE_BITMAP, IMAGE_ICON, IMAGE_CURSOR);                                                     // _In_ ...
+
     // Ref: https://stackoverflow.com/questions/65213494/how-to-register-a-window-with-the-default-cursor-using-loadimage-instead-of-lo
     // Ref: https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-loadimagew
     const HANDLE h = LoadImageW(NULL,               // [in, optional] HINSTANCE hInst

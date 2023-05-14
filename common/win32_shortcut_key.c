@@ -1,5 +1,6 @@
 #include "win32_shortcut_key.h"
-#include <assert.h>
+#include <assert.h>  // required for assert
+#include <stdlib.h>  // required for assert on MinGW
 
 const struct WStr WIN32_KM_SHIFT_LEFT_WSTR  = WSTR_FROM_LITERAL(L"LShift");
 const struct WStr WIN32_KM_SHIFT_RIGHT_WSTR = WSTR_FROM_LITERAL(L"RShift");

@@ -1,6 +1,7 @@
 #include "win32_errno.h"
 #include "log.h"
-#include <assert.h>
+#include <assert.h>  // required for assert
+#include <stdlib.h>  // required for assert on MinGW
 
 void
 Win32ErrnoGetWStr(_In_    const int    lastErrno,
@@ -17,11 +18,15 @@ Win32ErrnoGetWStr(_In_    const int    lastErrno,
 void
 Win32ErrnoFPutW(_In_ FILE *lpStream)
 {
-    if (false == Win32ErrnoFPutW2(lpStream,  // _In_  FILE *lpStream,
-                                      stderr))   // _Out_ FILE *lpErrorStream
-    {
-        abort();
-    }
+    assert(NULL != lpStream);
+
+    // Ref: https://en.cppreference.com/w/c/error/errno
+    // "errno is a preprocessor macro (but see note below) that expands to a thread-local (since C11) modifiable lvalue of type int."
+    const int lastErrno = errno;
+    // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/strerror-strerror-wcserror-wcserror?view=msvc-170
+    const wchar_t *lpErrorWCharArr = _wcserror(lastErrno);
+
+    LogWF(lpStream, L"ERROR: errno(%d): %ls\r\n", lastErrno, lpErrorWCharArr);
 }
 
 void
@@ -31,12 +36,13 @@ Win32ErrnoFPutWAbort(_In_ FILE *lpStream)
     abort();
 }
 
-bool
-Win32ErrnoFPutW2(_In_  FILE *lpStream,
-                 _Out_ FILE *lpErrorStream)
+void
+Win32ErrnoFPutWS(_In_ FILE          *lpStream,
+                 // @EmptyStringAllowed
+                 _In_ const wchar_t *lpMessage)
 {
     assert(NULL != lpStream);
-    assert(NULL != lpErrorStream);
+    assert(NULL != lpMessage);
 
     // Ref: https://en.cppreference.com/w/c/error/errno
     // "errno is a preprocessor macro (but see note below) that expands to a thread-local (since C11) modifiable lvalue of type int."
@@ -44,20 +50,13 @@ Win32ErrnoFPutW2(_In_  FILE *lpStream,
     // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/strerror-strerror-wcserror-wcserror?view=msvc-170
     const wchar_t *lpErrorWCharArr = _wcserror(lastErrno);
 
-    LogWF(lpStream, L"ERROR: errno(%d): %ls\r\n", lastErrno, lpErrorWCharArr);
-    return true;
-}
-
-void
-Win32ErrnoFPutWS(_In_ FILE          *lpStream,
-                 // @EmptyStringAllowed
-                 _In_ const wchar_t *lpMessage)
-{
-    if (false == Win32ErrnoFPutWS2(lpStream,   // _In_  FILE          *lpStream
-                                   lpMessage,  // _In_  const wchar_t *lpMessage
-                                   stderr))    // _Out_ FILE          *lpErrorStream
+    if ('\0' == lpMessage[0])
     {
-        abort();
+        LogWF(lpStream, L"ERROR: errno(%d): %ls\r\n", lastErrno, lpErrorWCharArr);
+    }
+    else
+    {
+        LogWF(lpStream, L"ERROR: %ls: errno(%d): %ls\r\n", lpMessage, lastErrno, lpErrorWCharArr);
     }
 }
 
@@ -71,30 +70,11 @@ Win32ErrnoFPutWSAbort(_In_ FILE          *lpStream,
     abort();
 }
 
-bool
-Win32ErrnoFPutWS2(_In_  FILE          *lpStream,
-                  // @EmptyStringAllowed
-                  _In_  const wchar_t *lpMessage,
-                  _Out_ FILE          *lpErrorStream)
-{
-    assert(NULL != lpStream);
-    assert(NULL != lpMessage);
-    assert(NULL != lpErrorStream);
-
-    // Ref: https://en.cppreference.com/w/c/error/errno
-    // "errno is a preprocessor macro (but see note below) that expands to a thread-local (since C11) modifiable lvalue of type int."
-    const int lastErrno = errno;
-    // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/strerror-strerror-wcserror-wcserror?view=msvc-170
-    const wchar_t *lpErrorWCharArr = _wcserror(lastErrno);
-
-    LogWF(lpStream, L"ERROR: errno(%d): %ls\r\n", lastErrno, lpErrorWCharArr);
-    return true;
-}
-
 void
 Win32ErrnoFPrintFW(_In_ FILE          *lpStream,
                    // @EmptyStringAllowed
-                   _In_ const wchar_t *lpMessageFormat, ...)
+                   _In_ const wchar_t *lpMessageFormat,
+                   _In_ ...)
 {
     // Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/va-arg-va-copy-va-end-va-start?view=msvc-170
     va_list ap;
@@ -113,7 +93,8 @@ Win32ErrnoFPrintFW(_In_ FILE          *lpStream,
 void
 Win32ErrnoFPrintFWAbort(_In_ FILE          *lpStream,
                         // @EmptyStringAllowed
-                        _In_ const wchar_t *lpMessageFormat, ...)
+                        _In_ const wchar_t *lpMessageFormat,
+                        _In_ ...)
 {
     // Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/va-arg-va-copy-va-end-va-start?view=msvc-170
     va_list ap;
@@ -130,7 +111,8 @@ bool
 Win32ErrnoFPrintFW2(_In_  FILE          *lpStream,
                     _Out_ FILE          *lpErrorStream,
                     // @EmptyStringAllowed
-                    _In_  const wchar_t *lpMessageFormat, ...)
+                    _In_  const wchar_t *lpMessageFormat,
+                    _In_  ...)
 {
     // Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/va-arg-va-copy-va-end-va-start?view=msvc-170
     va_list ap;

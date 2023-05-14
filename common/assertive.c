@@ -1,6 +1,7 @@
 #include "assertive.h"
 #include "log.h"
 #include <assert.h>  // required for assert
+#include <stdlib.h>  // required for assert on MinGW
 
 void
 AssertW(_In_ const bool     bAssertResult,

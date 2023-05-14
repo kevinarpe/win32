@@ -6,15 +6,23 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+// See: https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
 struct Win32FileCreateIndirect
 {
+    // Ex: WSTR_FROM_LITERAL(L"path/to/TestWin32FileCreate.txt")
     struct WStr           filePathWStr;
+    // Ex: (GENERIC_READ | GENERIC_WRITE)
     DWORD                 dwDesiredAccess;
+    // Ex: FILE_SHARE_READ
     DWORD                 dwShareMode;
+    // Ex: NULL
     // @Nullable
     LPSECURITY_ATTRIBUTES lpSecurityAttributes;
+    // Ex: CREATE_ALWAYS
     DWORD                 dwCreationDisposition;
+    // Ex: FILE_ATTRIBUTE_NORMAL
     DWORD                 dwFlagsAndAttributes;
+    // Ex: NULL
     // @Nullable
     HANDLE                hTemplateFile;
 };
@@ -30,23 +38,27 @@ struct Win32FileDescriptor
 
 enum EWin32FileStreamMode
 {
-    /* L"r"   Opens for reading. If the file doesn't exist or can't be found, the fopen call fails. */
+    // L"r"   Opens for reading. If the file doesn't exist or can't be found, the fopen call fails.
     FSM_READ        = 1,
-    /* L"w"   Opens an empty file for writing. If the given file exists, its contents are destroyed. */
+    // L"w"   Opens an empty file for writing. If the given file exists, its contents are destroyed.
     FSM_WRITE       = 2,
-    /* L"a"   Opens for writing at the end of the file (appending). Creates the file if it doesn't exist. */
+    // L"a"   Opens for writing at the end of the file (appending). Creates the file if it doesn't exist.
     FSM_APPEND      = 3,
-    /* L"r+"  Opens for both reading and writing. The file must exist. */
+    // L"r+"  Opens for both reading and writing. The file must exist.
     FSM_READ_PLUS   = 4,
-    /* L"w+"  Opens an empty file for both reading and writing. If the file exists, its contents are destroyed. */
+    // L"w+"  Opens an empty file for both reading and writing. If the file exists, its contents are destroyed.
     FSM_WRITE_PLUS  = 5,
-    /* L"a+"  Opens for reading and appending. Creates the file if it doesn't exist. */
+    // L"a+"  Opens for reading and appending. Creates the file if it doesn't exist.
     FSM_APPEND_PLUS = 6,
 };
 
 struct Win32FileStream
 {
-    enum EWin32FileStreamMode  mode;
+    // NUL-char terminated
+    // Ex: L"r+"
+    wchar_t                    mode[3];
+    // Ex: {@link FSM_READ_PLUS}
+    enum EWin32FileStreamMode  emode;
     // Invalid is NULL
     FILE                      *lpFile;
 };
@@ -59,6 +71,17 @@ struct Win32File
     struct Win32FileDescriptor     fd;
     struct Win32FileStream         stream;
 };
+
+/**
+ * Test if a file exists.
+ *
+ * @param lpFilePath
+ *        path to file for deletion
+ *
+ * @return {@code true} if file exists and is not a directory, else {@code false}
+ */
+bool
+Win32FileExists(_In_ const wchar_t *lpFilePath);
 
 /**
  * This is a convenience method to call Win32FileCreate2(lpFile, stderr).
@@ -75,7 +98,7 @@ Win32FileCreate(_Inout_ struct Win32File *lpFile);
  *
  * @param lpErrorStream
  *        stream to print errors
- *        usually 'stderr' (from <stdio.h>), but may be any valid stream
+ *        usually {@link stderr} (from <stdio.h>), but may be any valid stream
  *
  * @return true on success
  *         false on failure and error printed to {@code lpErrorStream}
@@ -89,8 +112,8 @@ Win32FileCreate2(_Inout_ struct Win32File *lpFile,
  * On error, abort() is called.
  */
 void
-Win32FileGetFileDescriptor(_Out_ struct Win32File *lpFile,
-                           _In_  const int         flags);
+Win32FileGetFileDescriptor(_Inout_ struct Win32File *lpFile,
+                           _In_    const int         flags);
 
 /**
  * Calls _open_osfhandle() to create file descriptor.
@@ -113,15 +136,15 @@ Win32FileGetFileDescriptor(_Out_ struct Win32File *lpFile,
  *
  * @param lpErrorStream
  *        stream to print errors
- *        usually 'stderr' (from <stdio.h>), but may be any valid stream
+ *        usually {@link stderr} (from <stdio.h>), but may be any valid stream
  *
  * @return true on success
  *         false on failure and error printed to {@code lpErrorStream}
  */
 bool
-Win32FileGetFileDescriptor2(_Out_ struct Win32File *lpFile,
-                            _In_  const int         flags,
-                            _Out_ FILE             *lpErrorStream);
+Win32FileGetFileDescriptor2(_Inout_ struct Win32File *lpFile,
+                            _In_    const int         flags,
+                            _Out_   FILE             *lpErrorStream);
 
 /**
  * This is a convenience method to call Win32FileGetFileStream2(lpFile, lpModeWCharArr, stderr).
@@ -141,12 +164,13 @@ Win32FileGetFileStream(_Inout_ struct Win32File *lpFile,
  *        L"w"   Opens an empty file for writing. If the given file exists, its contents are destroyed.
  *        L"a"   Opens for writing at the end of the file (appending). Creates the file if it doesn't exist.
  *        L"r+"  Opens for both reading and writing. The file must exist.
+ *               Use this value if struct Win32FileCreateIndirect.dwDesiredAccess is (GENERIC_READ | GENERIC_WRITE).
  *        L"w+"  Opens an empty file for both reading and writing. If the file exists, its contents are destroyed.
  *        L"a+"  Opens for reading and appending. Creates the file if it doesn't exist.
  *
  * @param lpErrorStream
  *        stream to print errors
- *        usually 'stderr' (from <stdio.h>), but may be any valid stream
+ *        usually {@link stderr} (from <stdio.h>), but may be any valid stream
  *
  * @return true on success
  *         false on failure and error printed to {@code lpErrorStream}
@@ -156,10 +180,33 @@ Win32FileGetFileStream2(_Inout_ struct Win32File *lpFile,
                         _In_    const wchar_t    *lpModeWCharArr,
                         _Out_   FILE             *lpErrorStream);
 
+/**
+ * This is a convenience method to call {@link Win32FileReadAll2(lpFile, lpWStr, stderr)}.
+ * On error, abort() is called.
+ */
 void
 Win32FileReadAll(_Inout_ struct Win32File *lpFile,
                  _Inout_ struct WStr      *lpWStr);
 
+/**
+ * Prequisite: lpFile->fd >= 0: Call Win32FileGetFileDescriptor2() before this method.
+ * Prequisite: NULL != lpFile->stream.lpFile: Call Win32FileGetFileStream2() before this method.
+ * Seeks to start of file, then reads all data as {@code wchar_t} values.
+ *
+ * @param lpFile
+ *        file to read all data as {@code wchar_t}
+ *
+ * @param lpWStr
+ *        file data is stored here as {@code wchar_t} after reading
+ *        existing string is freed with {@link WStrFree()}
+ *
+ * @param lpErrorStream
+ *        stream to print errors
+ *        usually {@link stderr} (from <stdio.h>), but may be any valid stream
+ *
+ * @return true on success
+ *         false on failure and error printed to {@code lpErrorStream}
+ */
 bool
 Win32FileReadAll2(_Inout_ struct Win32File *lpFile,
                   _Inout_ struct WStr      *lpWStr,
@@ -173,13 +220,15 @@ void
 Win32FileClose(_In_ struct Win32File *lpFile);
 
 /**
+ * Try to close a file.
+ *
  * If NULL != lpFile->lpFile, then call: fclose(lpFile->lpFile)
  * If lpFile->fd >= 0,        then call: _close(lpFile->fd)
  * If NULL != lpFile->hFile,  then call: CloseHandle(lpFile->hFile)
  *
  * @param lpErrorStream
  *        stream to print errors
- *        usually 'stderr' (from <stdio.h>), but may be any valid stream
+ *        usually {@link stderr} (from <stdio.h>), but may be any valid stream
  *
  * @return true on success
  *         false on failure and error printed to {@code lpErrorStream}
@@ -187,6 +236,30 @@ Win32FileClose(_In_ struct Win32File *lpFile);
 bool
 Win32FileClose2(_In_  struct Win32File *lpFile,
                 _Out_ FILE             *lpErrorStream);
+
+/**
+ * This is a convenience method to call {@link Win32FileDelete2(lpFilePath, stderr)}.
+ * On error, abort() is called.
+ */
+void
+Win32FileDelete(_In_ const wchar_t *lpFilePath);
+
+/**
+ * Try to delete a file.
+ *
+ * @param lpFilePath
+ *        path to file for deletion
+ *
+ * @param lpErrorStream
+ *        stream to print errors
+ *        usually {@link stderr} (from <stdio.h>), but may be any valid stream
+ *
+ * @return true on success
+ *         false on failure and error printed to {@code lpErrorStream}
+ */
+bool
+Win32FileDelete2(_In_  const wchar_t *lpFilePath,
+                 _Out_ FILE          *lpErrorStream);
 
 #endif  // H_COMMON_WIN32_FILE
 

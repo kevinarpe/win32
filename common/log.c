@@ -1,7 +1,7 @@
 #include "log.h"
 #include "win32.h"
-#include <assert.h>
-#include <stdlib.h>  // required for abs()
+#include <assert.h>  // required for assert
+#include <stdlib.h>  // required for assert on MinGW and abs()
 
 static void
 LogPrefix(FILE *fp)

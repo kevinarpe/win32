@@ -1,6 +1,7 @@
 #include "win32_monitor.h"
 #include "win32_last_error.h"
-#include <assert.h>
+#include <assert.h>  // required for assert
+#include <stdlib.h>  // required for assert on MinGW
 
 // Ref: "How do I get the handle of the primary monitor?" -> https://devblogs.microsoft.com/oldnewthing/20070809-00/?p=25643
 void

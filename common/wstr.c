@@ -2,7 +2,8 @@
 #include "xmalloc.h"
 #include "log.h"
 #include "win32_last_error.h"
-#include <assert.h>
+#include <assert.h>  // required for assert
+#include <stdlib.h>  // required for assert on MinGW
 #include <windows.h>
 #include <errno.h>
 

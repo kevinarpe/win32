@@ -2,7 +2,8 @@
 #include "win32_last_error.h"
 #include "win32_text.h"
 #include "assertive.h"
-#include <assert.h>
+#include <assert.h>  // required for assert
+#include <stdlib.h>  // required for assert on MinGW
 
 void
 Win32LayoutCalcDefaultButtonSize(_In_  HDC                                  hDC,

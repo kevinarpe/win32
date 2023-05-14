@@ -3,8 +3,21 @@
 #include "log.h"
 #include "win32_errno.h"
 #include "xmalloc.h"
-#include <assert.h>
+#include "assertive.h"
+#include <assert.h>  // required for assert
+#include <stdlib.h>  // required for assert on MinGW
 #include <io.h>
+
+bool
+Win32FileExists(_In_ const wchar_t *lpFilePath)
+{
+    assert(NULL != lpFilePath);
+
+    // Ref: https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfileattributesw
+    const DWORD dwAttrib = GetFileAttributesW(lpFilePath);  // [in] LPCWSTR lpFileName
+    const bool x = (INVALID_FILE_ATTRIBUTES != dwAttrib) && !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY);
+    return x;
+}
 
 void
 Win32FileCreate(_Inout_ struct Win32File *lpFile)
@@ -36,23 +49,24 @@ Win32FileCreate2(_Inout_ struct Win32File *lpFile,
     // "If the function fails, the return value is INVALID_HANDLE_VALUE. To get extended error information, call GetLastError."
     if (INVALID_HANDLE_VALUE == lpFile->hFile)
     {
-        Win32LastErrorFPrintFW2(lpErrorStream,                                // _In_  FILE          *lpStream
-                               lpErrorStream,                                 // _Out_ FILE          *lpErrorStream
-                               L"Failed to open file by file handle: [%ls]",  // _In_  const wchar_t *lpMessageFormat
-                               lpFile->indirect.filePathWStr.lpWCharArr);     // ...
+        Win32LastErrorFPrintFW2(lpErrorStream,                                                   // _In_  FILE          *lpStream
+                                lpErrorStream,                                                   // _Out_ FILE          *lpErrorStream
+                                L"Win32FileCreate2: Failed to open file by file handle: [%ls]",  // _In_  const wchar_t *lpMessageFormat
+                                lpFile->indirect.filePathWStr.lpWCharArr);                       // ...
         return false;
     }
 
-    lpFile->fd.flags      = 0;
-    lpFile->fd.fd         = -1;
-    lpFile->stream.mode   = 0;
-    lpFile->stream.lpFile = NULL;
+    lpFile->fd.flags       = 0;
+    lpFile->fd.fd          = -1;
+    lpFile->stream.mode[0] = 0;
+    lpFile->stream.emode   = 0;
+    lpFile->stream.lpFile  = NULL;
     return true;
 }
 
 void
-Win32FileGetFileDescriptor(_Out_ struct Win32File *lpFile,
-                           _In_  const int         flags)
+Win32FileGetFileDescriptor(_Inout_ struct Win32File *lpFile,
+                           _In_    const int         flags)
 {
     if (false == Win32FileGetFileDescriptor2(lpFile,   // _Inout_ struct Win32File *lpFile
                                              flags,    // _In_    const int         flags
@@ -75,10 +89,10 @@ Win32FileGetFileDescriptor2(_Inout_ struct Win32File *lpFile,
                                     flags);                    // _In_ int      flags
     if (-1 == lpFile->fd.fd)
     {
-        Win32LastErrorFPrintFW2(lpErrorStream,                                            // _In_  FILE          *lpStream
-                               lpErrorStream,                                             // _Out_ FILE          *lpErrorStream
-                               L"File [%ls]: -1 == _open_osfhandle(hFile:%p, flags:%d)",  // _In_  const wchar_t *lpMessageFormat
-                               lpFile->indirect.filePathWStr.lpWCharArr, lpFile->hFile, flags);
+        Win32LastErrorFPrintFW2(lpErrorStream,                                                                         // _In_  FILE          *lpStream
+                                lpErrorStream,                                                                          // _Out_ FILE          *lpErrorStream
+                                L"Win32FileGetFileDescriptor2: File [%ls]: -1 == _open_osfhandle(hFile:%p, flags:%d)",  // _In_  const wchar_t *lpMessageFormat
+                                lpFile->indirect.filePathWStr.lpWCharArr, lpFile->hFile, flags);                        // _In_  ...
         return false;
     }
 
@@ -133,8 +147,9 @@ StaticWin32FileGetMode(_In_  const wchar_t             *lpModeWCharArr,
     }
     else
     {
-        LogWF(lpErrorStream, L"ERROR: _wfdopen(): Unknown mode: [%ls]\r\n", lpModeWCharArr);
-        assert(false);
+        AssertWF(false,                                                       // _In_ const bool     bAssertResult
+                 L"StaticWin32FileGetMode: _wfdopen(): Unknown mode: [%ls]",  // _In_ const wchar_t *lpMessageFormatWCharArr
+                 lpModeWCharArr);                                             // _In_ ...
     }
 }
 
@@ -146,11 +161,14 @@ Win32FileGetFileStream2(_Inout_ struct Win32File *lpFile,
     assert(NULL != lpFile);
     assert(lpFile->fd.fd >= 0);
     assert(NULL != lpModeWCharArr);
+    AssertWF(2 <= wcslen(lpModeWCharArr),               // _In_ const bool     bAssertResult
+             L"2 <= %zd:wcslen(lpModeWCharArr:[%ls])",  // _In_ const wchar_t *lpMessageFormatWCharArr
+             wcslen(lpModeWCharArr), lpModeWCharArr);   // _In_ ...
     assert(NULL != lpErrorStream);
 
-    enum EWin32FileStreamMode mode = 0;
+    enum EWin32FileStreamMode emode = 0;
     StaticWin32FileGetMode(lpModeWCharArr,  // _In_  const wchar_t             *lpModeWCharArr
-                           &mode,           // _Out_ enum EWin32FileStreamMode *lpMode
+                           &emode,          // _Out_ enum EWin32FileStreamMode *lpMode
                            lpErrorStream);  // _Out_ FILE                      *lpErrorStream
 
     // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/fdopen-wfdopen?view=msvc-170
@@ -158,14 +176,17 @@ Win32FileGetFileStream2(_Inout_ struct Win32File *lpFile,
                                      lpModeWCharArr);  // const wchar_t *mode
     if (NULL == lpFile->stream.lpFile)
     {
-        Win32LastErrorFPrintFW2(lpErrorStream,                         // _In_  FILE          *lpStream,
-                                lpErrorStream,                         // _Out_ FILE          *lpErrorStream,
-                                L"File [%ls]: _wfdopen(%d, \"%ls\")",  // _In_  const wchar_t *lpMessageFormat
-                                lpFile->indirect.filePathWStr.lpWCharArr, lpFile->fd.fd, lpModeWCharArr);
+        Win32LastErrorFPrintFW2(lpErrorStream,                                                             // _In_  FILE          *lpStream
+                                lpErrorStream,                                                             // _Out_ FILE          *lpErrorStream
+                                L"Win32FileGetFileStream2: File [%ls]: _wfdopen(%d, \"%ls\")",             // _In_  const wchar_t *lpMessageFormat
+                                lpFile->indirect.filePathWStr.lpWCharArr, lpFile->fd.fd, lpModeWCharArr);  // _In_  ...
         return false;
     }
 
-    lpFile->stream.mode = mode;
+    // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/strcpy-wcscpy-mbscpy?view=msvc-170
+    wcscpy(lpFile->stream.mode,  // wchar_t *strDestination,
+           lpModeWCharArr);      // const wchar_t *strSource
+    lpFile->stream.emode = emode;
     return true;
 }
 
@@ -186,68 +207,74 @@ Win32FileReadAll2(_Inout_ struct Win32File *lpFile,
                   _Inout_ struct WStr      *lpWStr,
                   _Out_   FILE             *lpErrorStream)
 {
-    assert(NULL == lpFile);
-    assert(NULL == lpWStr);
+    assert(NULL != lpFile);
+    assert(lpFile->fd.fd >= 0);
+    assert(NULL != lpFile->stream.lpFile);
+    assert(NULL != lpWStr);
     WStrFree(lpWStr);
-    assert(NULL == lpErrorStream);
+    assert(NULL != lpErrorStream);
 
     // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/fseek-fseeki64?view=msvc-170
-    if (0 != fseek(lpErrorStream,  // FILE *stream
+    if (0 != fseek(lpFile->stream.lpFile,  // FILE *stream
                    // "Number of bytes from origin."
-                   (long) 0,       // long offset
+                   (long) 0,               // long offset
                    // "	End of file."
-                   SEEK_END))      // int origin
+                   SEEK_END))              // int origin
     {
-        Win32LastErrorFPutWS2(lpErrorStream,                                            // _In_  FILE          *lpStream
-                              L"0 != fseek(lpErrorStream(lpErrorStream, 0, SEEK_END)",  // _In_  const wchar_t *lpMessage
-                              lpErrorStream);                                           // _Out_ FILE          *lpErrorStream
+        Win32LastErrorFPutWS2(lpErrorStream,   // _In_  FILE          *lpStream
+                              L"Win32FileReadAll2: 0 != fseek(lpFile, 0, SEEK_END)",  // _In_  const wchar_t *lpMessage
+                              lpErrorStream);  // _Out_ FILE          *lpErrorStream
         return false;
     }
 
     // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/ftell-ftelli64?view=msvc-170
-    const __int64 currFilePos = _ftelli64(lpErrorStream);  // FILE *stream
-    if (-1 == currFilePos)
+    const __int64 currFilePosByte = _ftelli64(lpFile->stream.lpFile);  // FILE *stream
+    if (-1 == currFilePosByte)
     {
-        Win32LastErrorFPutWS2(lpErrorStream,                      // _In_  FILE          *lpStream
-                              L"-1 == _ftelli64(lpErrorStream)",  // _In_  const wchar_t *lpMessage
-                              lpErrorStream);                     // _Out_ FILE          *lpErrorStream
+        Win32LastErrorFPutWS2(lpErrorStream,   // _In_  FILE          *lpStream
+                              L"Win32FileReadAll2: -1 == _ftelli64(lpFile->stream.lpFile)",  // _In_  const wchar_t *lpMessage
+                              lpErrorStream);  // _Out_ FILE          *lpErrorStream
         return false;
     }
-printf("Win32TempFPrintFWV2(): currFilePos:%lld\r\n", currFilePos);
 
     // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/fseek-fseeki64?view=msvc-170
-    if (0 != fseek(lpErrorStream,  // FILE *stream
+    if (0 != fseek(lpFile->stream.lpFile,  // FILE *stream
                    // "Number of bytes from origin."
-                   (long) 0,       // long offset
+                   (long) 0,               // long offset
                    // "Initial position.  Beginning of file."
-                   SEEK_SET))      // int origin
+                   SEEK_SET))              // int origin
     {
-        Win32LastErrorFPutWS2(lpErrorStream,                                            // _In_  FILE          *lpStream
-                              L"0 != fseek(lpErrorStream(lpErrorStream, 0, SEEK_SET)",  // _In_  const wchar_t *lpMessage
-                              lpErrorStream);                                           // _Out_ FILE          *lpErrorStream
+        Win32LastErrorFPutWS2(lpErrorStream,   // _In_  FILE          *lpStream
+                              L"Win32FileReadAll2: 0 != fseek(lpFile->stream.lpFile, 0, SEEK_SET)",  // _In_  const wchar_t *lpMessage
+                              lpErrorStream);  // _Out_ FILE          *lpErrorStream
         return false;
     }
 
-    lpWStr->ulSize = currFilePos;
-    lpWStr->lpWCharArr = xcalloc(currFilePos + LEN_NUL_CHAR,  // _In_ const size_t ulNumItem
-                                 sizeof(wchar_t));            // _In_ const size_t ulSizeOfEachItem
+    // Note: If the file system is full (out of space), it is possible to write *part* of one wchar_t,
+    // e.g., 1 byte of a 2 byte (Win32) wchar_t.  This statement will round to the number of whole values of wchar_t.
+    lpWStr->ulSize     = currFilePosByte / sizeof(wchar_t);
+    lpWStr->lpWCharArr = xcalloc(lpWStr->ulSize + LEN_NUL_CHAR,  // _In_ const size_t ulNumItem
+                                 sizeof(wchar_t));               // _In_ const size_t ulSizeOfEachItem
 
     // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/fread?view=msvc-170
-    const size_t n = fread(lpWStr->lpWCharArr,          // void *buffer
-                           // "Item size in bytes."
-                           sizeof(wchar_t),             // size_t size
-                           // "Maximum number of items to be read."
-                           currFilePos + LEN_NUL_CHAR,  // size_t count
-                           lpErrorStream);              // FILE *stream
-    if (n < (size_t) currFilePos)
+    const size_t wcharCount = fread(lpWStr->lpWCharArr,             // void *buffer
+                                    // "Item size in bytes."
+                                    sizeof(wchar_t),                // size_t size
+                                    // "Maximum number of items to be read."
+                                    lpWStr->ulSize + LEN_NUL_CHAR,  // size_t count
+                                    lpFile->stream.lpFile);         // FILE *stream
+
+    if (wcharCount < lpWStr->ulSize)
     {
+        Win32LastErrorFPrintFW2(lpErrorStream,  // _In_  FILE          *lpStream
+                                lpErrorStream,  // _Out_ FILE          *lpErrorStream
+                                L"Win32FileReadAll2: currFilePosByte:%lld != %zd:fread(lpWStr->lpWCharArr:[%ls], sizeof(wchar_t):%zd, currFilePosByte:%lld + LEN_NUL_CHAR:%d, lpFile->stream.lpFile)",  // _In_  const wchar_t *lpMessage
+                                currFilePosByte, wcharCount, lpWStr->lpWCharArr, sizeof(wchar_t), currFilePosByte, LEN_NUL_CHAR);  // _In_  ...
+
         xfree((void **) &lpWStr->lpWCharArr);  // _Inout_ void **lppData
-        Win32LastErrorFPrintFW2(lpErrorStream,                                                                                         // _In_  FILE          *lpStream
-                                lpErrorStream,                                                                                         // _Out_ FILE          *lpErrorStream
-                                L"n:%zd != fread(lpWStr.lpWCharArr, sizeof(wchar_t), currFilePos:%ld + LEN_NUL_CHAR, lpErrorStream)",  // _In_  const wchar_t *lpMessage
-                                n, currFilePos);                                                                                       // ...
         return false;
     }
+
     return true;
 }
 
@@ -280,10 +307,10 @@ Win32FileClose2(_In_  struct Win32File *lpFile,
         // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/fclose-fcloseall?view=msvc-170
         if (0 != fclose(lpFile->stream.lpFile))  // FILE *stream
         {
-            Win32ErrnoFPrintFW2(lpErrorStream,                                  // _In_  FILE          *lpStream
-                                lpErrorStream,                                  // _Out_ FILE          *lpErrorStream
-                                L"Failed to close file by FILE stream: [%ls]",  // _In_  const wchar_t *lpMessageFormat
-                                lpFile->indirect.filePathWStr.lpWCharArr);     // ...
+            Win32ErrnoFPrintFW2(lpErrorStream,                                                   // _In_  FILE          *lpStream
+                                lpErrorStream,                                                   // _Out_ FILE          *lpErrorStream
+                                L"Win32FileClose2: Failed to close file by FILE stream: [%ls]",  // _In_  const wchar_t *lpMessageFormat
+                                lpFile->indirect.filePathWStr.lpWCharArr);                       // _In_  ...
             return false;
         }
     }
@@ -297,10 +324,10 @@ Win32FileClose2(_In_  struct Win32File *lpFile,
         // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/close?view=msvc-170
         if (0 != _close(lpFile->fd.fd))  // int fd
         {
-            Win32ErrnoFPrintFW2(lpErrorStream,                                      // _In_  FILE          *lpStream
-                                lpErrorStream,                                      // _Out_ FILE          *lpErrorStream
-                                L"Failed to close file by file descriptor: [%ls]",  // _In_  const wchar_t *lpMessageFormat
-                                lpFile->indirect.filePathWStr.lpWCharArr);          // ...
+            Win32ErrnoFPrintFW2(lpErrorStream,                                                       // _In_  FILE          *lpStream
+                                lpErrorStream,                                                       // _Out_ FILE          *lpErrorStream
+                                L"Win32FileClose2: Failed to close file by file descriptor: [%ls]",  // _In_  const wchar_t *lpMessageFormat
+                                lpFile->indirect.filePathWStr.lpWCharArr);                           // _In_  ...
             return false;
         }
     }
@@ -313,18 +340,49 @@ Win32FileClose2(_In_  struct Win32File *lpFile,
         // Ref: https://learn.microsoft.com/en-us/windows/win32/api/handleapi/nf-handleapi-closehandle
         if (0 == CloseHandle(lpFile->hFile))  // [in] HANDLE hObject
         {
-            Win32LastErrorFPrintFW2(lpErrorStream,                                  // _In_  FILE          *lpStream,
-                                    lpErrorStream,                                  // _Out_ FILE          *lpErrorStream,
-                                    L"Failed to close file by file handle: [%ls]",  // _In_  const wchar_t *lpMessageFormat
-                                    lpFile->indirect.filePathWStr.lpWCharArr);      // ...
+            Win32LastErrorFPrintFW2(lpErrorStream,                                                   // _In_  FILE          *lpStream,
+                                    lpErrorStream,                                                   // _Out_ FILE          *lpErrorStream,
+                                    L"Win32FileClose2: Failed to close file by file handle: [%ls]",  // _In_  const wchar_t *lpMessageFormat
+                                    lpFile->indirect.filePathWStr.lpWCharArr);                       // _In_  ...
             return false;
         }
     }
-    lpFile->hFile         = NULL;
-    lpFile->fd.flags      = 0;
-    lpFile->fd.fd         = -1;
-    lpFile->stream.mode   = 0;
-    lpFile->stream.lpFile = NULL;
+
+    lpFile->hFile          = NULL;
+    lpFile->fd.flags       = 0;
+    lpFile->fd.fd          = -1;
+    lpFile->stream.mode[0] = 0;
+    lpFile->stream.emode   = 0;
+    lpFile->stream.lpFile  = NULL;
+    return true;
+}
+
+void
+Win32FileDelete(_In_ const wchar_t *lpFilePath)
+{
+    if (false == Win32FileDelete2(lpFilePath,  // _In_  const wchar_t *lpFilePath
+                                  stderr))     // _Out_ FILE          *lpErrorStream
+    {
+        abort();
+    }
+}
+
+bool
+Win32FileDelete2(_In_  const wchar_t *lpFilePath,
+                 _Out_ FILE          *lpErrorStream)
+{
+    assert(NULL != lpFilePath);
+    assert(NULL != lpErrorStream);
+
+    if (0 == DeleteFileW(lpFilePath))  // [in] LPCWSTR lpFileName
+    {
+        Win32LastErrorFPrintFW2(lpErrorStream,                    // _In_  FILE          *lpStream,
+                                lpErrorStream,                    // _Out_ FILE          *lpErrorStream,
+                                L"Failed to delete file: [%ls]",  // _In_  const wchar_t *lpMessageFormat
+                                lpFilePath);                      // _In_  ...
+        return false;
+    }
+
     return true;
 }
 

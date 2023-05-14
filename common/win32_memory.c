@@ -1,8 +1,8 @@
 #include "win32_memory.h"
 #include "win32.h"
 #include "log.h"
-#include <assert.h>
-#include <stdlib.h>
+#include <assert.h>  // required for assert
+#include <stdlib.h>  // required for assert on MinGW
 
 void
 Win32MemoryLocalFree(_In_ void **lppBufferToFree)

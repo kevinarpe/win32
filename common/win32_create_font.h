@@ -11,6 +11,8 @@ struct Win32Font
     // Classic font "point" size, e.g., 14
     UINT            fontPointSize;
     struct Win32DPI dpi;
+    // "The weight of the font in the range 0 through 1000. For example, 400 (FW_NORMAL/FW_REGULAR) is normal
+    //  and 700 (FW_BOLD) is bold. If this value is zero, a default weight is used."
     LONG            weight;
     BOOL            isItalic;
     BOOL            isUnderline;

@@ -19,8 +19,16 @@ Win32ErrnoGetWStr(_In_    const int    lastErrno,
                   _Inout_ struct WStr *lpWStr);
 
 /**
- * This is a convenience method to call {@code Win32ErrnoFPutW2(lpStream, stderr)}.
- * On error, abort() is called.
+ * Get error message text for 'errno', then log to {@code lpStream}.
+ * <br>Example printed text: L"2022-03-10 22:17:47.123 +09:00 ERROR: errno(3/0x0003): Path not found\r\n"
+ *
+ * @param lpStream
+ *        stream to print errors
+ *        usually 'stderr' (from <stdio.h>), but may be any valid stream
+ *
+ * @param lpErrorStream
+ *        stream to print errors
+ *        usually 'stderr' (from <stdio.h>), but may be any valid stream
  */
 void
 Win32ErrnoFPutW(_In_ FILE *lpStream);
@@ -33,27 +41,7 @@ void
 Win32ErrnoFPutWAbort(_In_ FILE *lpStream);
 
 /**
- * Get error message text for 'errno', then log to {@code lpStream}.
- * <br>Example printed text: L"2022-03-10 22:17:47.123 +09:00 ERROR: errno(3/0x0003): Path not found\r\n"
- *
- * @param lpStream
- *        stream to print errors
- *        usually 'stderr' (from <stdio.h>), but may be any valid stream
- *
- * @param lpErrorStream
- *        stream to print errors
- *        usually 'stderr' (from <stdio.h>), but may be any valid stream
- *
- * @return true on success
- *         false on failure and error printed to {@code lpErrorStream}
- */
-bool
-Win32ErrnoFPutW2(_In_  FILE *lpStream,
-                 _Out_ FILE *lpErrorStream);
-
-/**
  * This is a convenience method to call {@code Win32ErrnoFPutWS2(lpStream, lpMessage, stderr)}.
- * On error, abort() is called.
  */
 void
 Win32ErrnoFPutWS(_In_ FILE          *lpStream,
@@ -84,11 +72,8 @@ Win32ErrnoFPutWSAbort(_In_ FILE          *lpStream,
  * @param lpErrorStream
  *        stream to print errors
  *        usually 'stderr' (from <stdio.h>), but may be any valid stream
- *
- * @return true on success
- *         false on failure and error printed to {@code lpErrorStream}
  */
-bool
+void
 Win32ErrnoFPutWS2(_In_  FILE          *lpStream,
                   // @EmptyStringAllowed
                   _In_  const wchar_t *lpMessage,
@@ -101,7 +86,8 @@ Win32ErrnoFPutWS2(_In_  FILE          *lpStream,
 void
 Win32ErrnoFPrintFW(_In_ FILE          *lpStream,
                    // @EmptyStringAllowed
-                   _In_ const wchar_t *lpMessageFormat, ...);
+                   _In_ const wchar_t *lpMessageFormat,
+                   _In_ ...);
 
 /**
  * This is a convenience method to call {@code Win32ErrnoFPrintFWV2(lpStream, lpMessageFormat, ap, stderr)},
@@ -110,7 +96,8 @@ Win32ErrnoFPrintFW(_In_ FILE          *lpStream,
 void
 Win32ErrnoFPrintFWAbort(_In_ FILE          *lpStream,
                         // @EmptyStringAllowed
-                        _In_ const wchar_t *lpMessageFormat, ...);
+                        _In_ const wchar_t *lpMessageFormat,
+                        _In_ ...);
 
 /**
  * This is a convenience method to call {@code Win32ErrnoFPrintFWV2(lpStream, lpMessageFormat, ap, lpErrorStream)}.
@@ -119,7 +106,8 @@ bool
 Win32ErrnoFPrintFW2(_In_  FILE          *lpStream,
                     _Out_ FILE          *lpErrorStream,
                     // @EmptyStringAllowed
-                    _In_  const wchar_t *lpMessageFormat, ...);
+                    _In_  const wchar_t *lpMessageFormat,
+                    _In_  ...);
 
 /**
  * This is a convenience method to call {@code Win32ErrnoFPrintFWV2(lpStream, lpMessageFormat, ap, stderr)}.

@@ -13,9 +13,9 @@ typedef enum EVisitNext
                           _Inout_ void          *lpData);
 
 void
-Win32FileAttrMaskVisitEach(_In_    const DWORD              dwFileAttrMask,
+Win32FileAttrMaskVisitEach(_In_    const DWORD                   dwFileAttrMask,
                            _In_    const Win32FileAttrVisitFunc  fpFileAttrVisitFunc,
-                           _Inout_ void                    *lpData);
+                           _Inout_ void                          *lpData);
 
 void
 Win32FileAttrMaskToWStrArr(_In_    const DWORD     dwFileAttrMask,

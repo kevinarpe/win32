@@ -1,6 +1,7 @@
 #include "win32_create_font.h"
 #include "win32_last_error.h"
-#include <assert.h>
+#include <assert.h>  // required for assert
+#include <stdlib.h>  // required for assert on MinGW
 
 void
 Win32CreateFont(_Inout_ struct Win32Font *lpWin32Font)
@@ -30,6 +31,16 @@ Win32CreateFont(_Inout_ struct Win32Font *lpWin32Font)
                      lpWin32Font->dpi.dpi,        // [in] int nNumerator
                      POINTS_PER_INCH);            // [in] int nDenominator
 
+    // "The average width, in logical units, of characters in the font. If lfWidth is zero, the aspect ratio of the device
+    //  is matched against the digitization aspect ratio of the available fonts to find the closest match,
+    //  determined by the absolute value of the difference."
+    // lpWin32Font->logFont.lfWidth = 0;
+
+    lpWin32Font->logFont.lfWeight    = lpWin32Font->weight;
+    lpWin32Font->logFont.lfItalic    = lpWin32Font->isItalic;
+    lpWin32Font->logFont.lfUnderline = lpWin32Font->isUnderline;
+    lpWin32Font->logFont.lfStrikeOut = lpWin32Font->isStrikeOut;
+
     // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/strcpy-s-wcscpy-s-mbscpy-s?view=msvc-170
     if (wcscpy_s(lpWin32Font->logFont.lfFaceName,                                                       // [inout] wchar_t *dest
                  sizeof(lpWin32Font->logFont.lfFaceName) / sizeof(lpWin32Font->logFont.lfFaceName[0]),  // [in]    rsize_t dest_size
@@ -39,11 +50,6 @@ Win32CreateFont(_Inout_ struct Win32Font *lpWin32Font)
                                     L"wcscpy_s(lpWin32Font->logFont.lfFaceName, ..., lpWin32Font->fontFaceNameWStr.lpWCharArr[%ls])",  // _In_ const wchar_t *lpMessageFormat,
                                     lpWin32Font->fontFaceNameWStr.lpWCharArr);  // ...
     }
-
-    lpWin32Font->logFont.lfWeight = lpWin32Font->weight;
-    lpWin32Font->logFont.lfItalic = lpWin32Font->isItalic;
-    lpWin32Font->logFont.lfUnderline = lpWin32Font->isUnderline;
-    lpWin32Font->logFont.lfStrikeOut = lpWin32Font->isStrikeOut;
 
     // Ref: https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-createfontindirectw
     lpWin32Font->hFont = CreateFontIndirectW(&lpWin32Font->logFont);

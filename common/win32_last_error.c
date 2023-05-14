@@ -1,6 +1,7 @@
 #include "win32_last_error.h"
 #include "log.h"
-#include <assert.h>
+#include <assert.h>  // required for assert
+#include <stdlib.h>  // required for assert on MinGW
 
 /**
  * @param lpWStr
@@ -153,9 +154,9 @@ Win32LastErrorFPutWSAbort(_In_ FILE          *lpStream,
 
 bool
 Win32LastErrorFPutWS2(_In_  FILE          *lpStream,
-                       // @EmptyStringAllowed
-                       _In_  const wchar_t *lpMessage,
-                       _Out_ FILE          *lpErrorStream)
+                      // @EmptyStringAllowed
+                      _In_  const wchar_t *lpMessage,
+                      _Out_ FILE          *lpErrorStream)
 {
     assert(NULL != lpStream);
     assert(NULL != lpMessage);
@@ -184,9 +185,9 @@ Win32LastErrorFPrintFW(_In_ FILE          *lpStream,
     va_list ap;
     va_start(ap, lpMessageFormat);
     const bool b = Win32LastErrorFPrintFWV2(lpStream,         // _In_  FILE          *lpStream
-                                           lpMessageFormat,  // _In_  const wchar_t *lpMessageFormat
-                                           ap,               // _In_  va_list        ap
-                                           stderr);          // _Out_ FILE          *lpErrorStream
+                                            lpMessageFormat,  // _In_  const wchar_t *lpMessageFormat
+                                            ap,               // _In_  va_list        ap
+                                            stderr);          // _Out_ FILE          *lpErrorStream
     va_end(ap);
     if (false == b)
     {
@@ -203,9 +204,9 @@ Win32LastErrorFPrintFWAbort(_In_ FILE          *lpStream,
     va_list ap;
     va_start(ap, lpMessageFormat);
     Win32LastErrorFPrintFWV2(lpStream,         // _In_  FILE          *lpStream
-                            lpMessageFormat,  // _In_  const wchar_t *lpMessageFormat
-                            ap,               // _In_  va_list        ap
-                            stderr);          // _Out_ FILE          *lpErrorStream
+                             lpMessageFormat,  // _In_  const wchar_t *lpMessageFormat
+                             ap,               // _In_  va_list        ap
+                             stderr);          // _Out_ FILE          *lpErrorStream
     va_end(ap);
     abort();
 }
@@ -220,9 +221,9 @@ Win32LastErrorFPrintFW2(_In_  FILE          *lpStream,
     va_list ap;
     va_start(ap, lpMessageFormat);
     const bool b = Win32LastErrorFPrintFWV2(lpStream,         // _In_  FILE          *lpStream
-                                           lpMessageFormat,  // _In_  const wchar_t *lpMessageFormat
-                                           ap,               // _In_  va_list        ap
-                                           lpErrorStream);   // _Out_ FILE          *lpErrorStream
+                                            lpMessageFormat,  // _In_  const wchar_t *lpMessageFormat
+                                            ap,               // _In_  va_list        ap
+                                            lpErrorStream);   // _Out_ FILE          *lpErrorStream
     va_end(ap);
     return b;
 }
@@ -234,9 +235,9 @@ Win32LastErrorFPrintFWV(_In_  FILE          *lpStream,
                         _In_  va_list        ap)
 {
     if (false == Win32LastErrorFPrintFWV2(lpStream,         // _In_  FILE          *lpStream
-                                         lpMessageFormat,  // _In_  const wchar_t *lpMessageFormat
-                                         ap,               // _In_  va_list        ap
-                                         stderr))          // _Out_ FILE          *lpErrorStream
+                                          lpMessageFormat,  // _In_  const wchar_t *lpMessageFormat
+                                          ap,               // _In_  va_list        ap
+                                          stderr))          // _Out_ FILE          *lpErrorStream
     {
         abort();
     }
@@ -249,9 +250,9 @@ Win32LastErrorFPrintFWVAbort(_In_  FILE          *lpStream,
                              _In_  va_list        ap)
 {
     Win32LastErrorFPrintFWV2(lpStream,         // _In_  FILE          *lpStream
-                            lpMessageFormat,  // _In_  const wchar_t *lpMessageFormat
-                            ap,               // _In_  va_list        ap
-                            stderr);          // _Out_ FILE          *lpErrorStream
+                             lpMessageFormat,  // _In_  const wchar_t *lpMessageFormat
+                             ap,               // _In_  va_list        ap
+                             stderr);          // _Out_ FILE          *lpErrorStream
     abort();
 }
 
@@ -295,7 +296,7 @@ Win32LastErrorFPrintFWV2(_In_  FILE          *lpStream,
         const int last_errno = errno;
         // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/strerror-strerror-wcserror-wcserror?view=msvc-170
         const wchar_t *lpErrorWCharArr = _wcserror(last_errno);
-        LogWF(lpErrorStream, L"errno(%d): %ls\r\n", last_errno, lpErrorWCharArr);
+        LogWF(lpErrorStream, L"Errno:%d: %ls\r\n", last_errno, lpErrorWCharArr);
         return false;
     }
 
@@ -304,8 +305,8 @@ Win32LastErrorFPrintFWV2(_In_  FILE          *lpStream,
         fputws(L": ", lpStream);
     }
 
-    fputws(wstr.lpWCharArr, lpStream);
-    fputws(L"\r\n", lpStream);
+    // Ref: https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/fprintf-fprintf-l-fwprintf-fwprintf-l?view=msvc-170
+    fwprintf(lpStream, L"LastError:%u/0x%X: %ls\r\n", dwLastError, dwLastError, wstr.lpWCharArr);
     return true;
 }
 

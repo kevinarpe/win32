@@ -7,7 +7,8 @@
 #include "win32_text.h"
 #include "win32_layout.h"
 #include "log.h"
-#include <assert.h>
+#include <assert.h>  // required for assert
+#include <stdlib.h>  // required for assert on MinGW
 
 // extern
 const wchar_t *WIN32_MESSAGE_BOX_CLASS_NAMEW = L"WIN32_MESSAGE_BOX";
@@ -148,7 +149,7 @@ WindowLayoutInit(_Inout_ struct Window *lpWin)
     // Assumption: All buttons will be same height; most buttons will be same width -- a few will be wider.
     SIZE *lpButtonSizeArr =
         xcalloc(lpWin->createParams.buttonArr.ulSize,  // _In_ const size_t ulNumItem
-                sizeof(SIZE));                     // _In_ const size_t ulSizeOfEachItem
+                sizeof(SIZE));                         // _In_ const size_t ulSizeOfEachItem
 
     for (size_t i = 0; i < lpWin->createParams.buttonArr.ulSize; ++i)
     {

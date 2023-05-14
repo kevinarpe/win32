@@ -1,6 +1,7 @@
 #include "win32_fileattr.h"
 #include "xmalloc.h"
-#include <assert.h>
+#include <assert.h>  // required for assert
+#include <stdlib.h>  // required for assert on MinGW
 #include <windows.h>
 #include <stdio.h>
 

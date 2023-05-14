@@ -16,22 +16,31 @@ main()
 
     bashlib_log_and_run_cmd \
         ../build.bash
-#        echo ../build.bash
 
+    # Build, then run
     local csrc
     for csrc in *_test.c
     do
         local bname
         # Ex: "wstr_test.c" -> "wstr_test"
         bname="$(basename "$csrc" '.c')"
-        build_then_run "$bname"
+        build "$bname"
+    done
+
+    for csrc in *_test.c
+    do
+        local bname
+        # Ex: "wstr_test.c" -> "wstr_test"
+        bname="$(basename "$csrc" '.c')"
+        bashlib_log_and_run_cmd \
+            wine64 "$bname.exe"
     done
 
     bashlib_log_and_run_cmd \
         cd -
 }
 
-build_then_run()
+build()
 {
     # Ex: "wstr_test"
     local test_module="$1" ; shift
@@ -51,9 +60,6 @@ build_then_run()
 
     bashlib_log_and_run_cmd \
         ls -l "$test_module.exe"
-
-    bashlib_log_and_run_cmd \
-        wine64 "$test_module.exe"
 }
 
 main "$@"

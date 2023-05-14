@@ -1,6 +1,7 @@
 #include "wstrtoint.h"
 #include "log.h"
-#include <assert.h>
+#include <assert.h>  // required for assert
+#include <stdlib.h>  // required for assert on MinGW
 #include <inttypes.h>  // required for wcstoimax()
 #include <errno.h>
 #include <stdarg.h>    // required for va_list, etc.

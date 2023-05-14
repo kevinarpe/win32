@@ -1,11 +1,16 @@
 #include "win32_set_focus.h"
 #include "win32_last_error.h"
+#include <assert.h>  // required for assert
+#include <stdlib.h>  // required for assert on MinGW
 
 // @Nullable
 HWND
-Win32SetFocus(_In_opt_ HWND           hWnd,
-              _In_     const wchar_t *lpszErrorMsgFmt, ...)
+Win32SetFocus(_In_opt_ HWND           hNullableWnd,
+              _In_     const wchar_t *lpszErrorMsgFmt,
+              _In_     ...)
 {
+    assert(NULL != lpszErrorMsgFmt);
+
     // Ref: https://learn.microsoft.com/en-us/windows/win32/api/errhandlingapi/nf-errhandlingapi-setlasterror
     SetLastError(0);
 
@@ -13,7 +18,7 @@ Win32SetFocus(_In_opt_ HWND           hWnd,
     // Before this function returns, the following window messages are received by wndproc:
     // WM_QUERYNEWPALETTE, WM_ACTIVATEAPP, WM_NCACTIVATE, WM_ACTIVATE(, WM_SETFOCUS, WM_KILLFOCUS), WM_COMMAND
     // @Nullable
-    const HWND nullableHWndLostFocus = SetFocus(hWnd);
+    const HWND nullableHWndLostFocus = SetFocus(hNullableWnd);
     if (NULL == nullableHWndLostFocus  // [in, optional] HWND hWnd
         && 0 != GetLastError())
     {

@@ -15,6 +15,7 @@ extern const wchar_t *WIN32_DPI_AWARENESS_TO_WCHAR_ARR_MAP[];
 
 struct Win32DPI
 {
+    // Ref: https://learn.microsoft.com/en-us/windows/win32/api/windef/ne-windef-dpi_awareness
     DPI_AWARENESS dpiAwareness;
     // Note: Default is 96 (100% scaling): #define USER_DEFAULT_SCREEN_DPI ...
     UINT          dpi;
@@ -33,8 +34,14 @@ struct Win32DPI
     })
 
 /**
+ * Retrieves {@link DPI_AWARENESS} and DPI (system or monitor for {@code hWnd}).
+ *
  * @param lpDpi
- *        Callers must init the struct with: DPI_INIT(struct DPI dpi)
+ *        struct must be initailised with {@link WIN32_DPI_INIT},
+ *        e.g., {@code struct Win32DPI win32Dpi = WIN32_DPI_INIT;}
+ *
+ * @param hWnd
+ *        when {@link DPI_AWARENESS_PER_MONITOR_AWARE}, then call {@link GetDpiForWindow(HWND)}
  */
 void
 Win32DPIGet(_Inout_ struct Win32DPI *lpDpi,

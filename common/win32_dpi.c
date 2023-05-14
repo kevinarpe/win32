@@ -1,7 +1,8 @@
 #include "win32_dpi.h"
 #include "win32_last_error.h"
 #include "log.h"
-#include <assert.h>
+#include <assert.h>  // required for assert
+#include <stdlib.h>  // required for assert on MinGW
 
 // Ref: https://learn.microsoft.com/en-us/windows/win32/learnwin32/dpi-and-device-independent-pixels
 // "In typography, the size of type is measured in units called points. One point equals 1/72 of an inch."
@@ -20,6 +21,7 @@ Win32DPIGet(_Inout_ struct Win32DPI *lpDpi,
             _In_    const HWND       hWnd)
 {
     assert(NULL != lpDpi);
+    assert(NULL != hWnd);
     // Ref: https://github.com/microsoft/Windows-classic-samples/blob/main/Samples/DPIAwarenessPerWindow/client/DpiAwarenessContext.cpp#L241
     // Ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getthreaddpiawarenesscontext
     const DPI_AWARENESS_CONTEXT dpiCx = GetThreadDpiAwarenessContext();
@@ -51,17 +53,17 @@ Win32DPIGet(_Inout_ struct Win32DPI *lpDpi,
             dpi = GetDpiForWindow(hWnd);  // [in] HWND hwnd
             if (0 == dpi)
             {
-                Win32LastErrorFPrintFWAbort(stderr,         // _In_ FILE          *lpStream
-                                            L"Win32DPIGet: 0 == GetDpiForWindow(hWnd:%p): Invalid HWND",  // _In_ const wchar_t *lpMessageFormat
-                                            dpiAwareness);  // ...
+                Win32LastErrorFPrintFWAbort(stderr,               // _In_ FILE          *lpStream
+                                            L"Win32DPIGet: DPI_AWARENESS:%d, 0 == GetDpiForWindow(hWnd:%p): Invalid HWND",  // _In_ const wchar_t *lpMessageFormat
+                                            dpiAwareness, hWnd);  // ...
             }
             break;
         }
         default:
         {
             Win32LastErrorFPrintFWAbort(stderr,         // _In_ FILE          *lpStream
-                                        L"Win32DPIGet: Unknown DPI_AWARENESS[%d] == GetAwarenessFromDpiAwarenessContext(...)",  // _In_ const wchar_t *lpMessageFormat
-                                        dpiAwareness);  // ...
+                                        L"Win32DPIGet: Unknown DPI_AWARENESS:%d == GetAwarenessFromDpiAwarenessContext(...)",  // _In_ const wchar_t *lpMessageFormat
+                                        dpiAwareness);  // _In_ ...
         }
     }
 
